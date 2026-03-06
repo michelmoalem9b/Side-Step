@@ -1037,11 +1037,12 @@ def create_app(token: str | None = None, port: int = 8770) -> FastAPI:
         await websocket.accept()
         try:
             while True:
-                msg = await tm.get_training_update()
-                if msg is not None:
-                    await websocket.send_json(msg)
+                batch = tm.drain_training_updates(limit=50)
+                if batch:
+                    for msg in batch:
+                        await websocket.send_json(msg)
                 else:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.3)
         except WebSocketDisconnect:
             pass
 

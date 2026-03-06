@@ -13,7 +13,7 @@
 **Standalone training toolkit for ACE-Step 1.5 audio generation models.**
 Takes you from raw audio files to a working adapter without the friction. Variant-aware multi-adapter fine-tuning (LoRA, DoRA, LoKR, LoHA, OFT) with auto-detection, low-VRAM support, and three ways to work.
 
-> **Status:** v1.0.1 -- Stable enough for daily use. Some features are still experimental. This is beta software being maintained by one person only; if you encounter an issue, please let me know in the issues tab.
+> **Status:** v1.0.1-beta -- Stable enough for daily use. Some features are still experimental. This is beta software being maintained by one person only; if you encounter an issue, please let me know in the issues tab.
 
 ## Why Side-Step?
 
@@ -254,3 +254,5 @@ See `sidestep_documentation/` for detailed guides:
 ---
 
 Contributions are always welcome. The inherent novelty of Audio Transformer-Based Diffusion makes these scripts fresh, and your contributions help every one of us. Open an issue, send a PR, or just share your results.
+
+Massive shoutout to [Signorlimone](https://github.com/Signorlimone) for designing and compositing the Side-Step logo.

@@ -9,6 +9,10 @@ const WorkspaceConfig = (() => {
   function initCLIExport() {
     $("btn-export-cli")?.addEventListener("click", () => {
       const config = gatherFullConfig();
+      if (!config.run_name) config.run_name = (config.adapter_type || "lora") + "_" + (config.model_variant || "turbo") + "_export";
+      if (!config.output_dir) {
+        config.output_dir = _joinPath($("settings-adapters-dir")?.value || Defaults.get("settings-adapters-dir") || "trained_adapters", config.adapter_type || "lora", config.run_name);
+      }
       const cmd = API.buildCLICommand(config);
       const panel = $("cli-export-panel");
       const content = $("cli-export-content");
@@ -349,7 +353,7 @@ const WorkspaceConfig = (() => {
       const fi = $("full-dataset-info");
       if (fi) {
         const ppCls = folder.pp_map ? "u-text-success" : "u-text-muted";
-        const ppT = folder.pp_map ? "PP++ map: detected [ok]" : "PP++ map: not found";
+        const ppT = folder.pp_map ? "PP++ map: detected [ok]" : "PP++ map: none (optional)";
         fi.innerHTML = '<div class="u-text-success">' + _esc(folder.files) + ' samples, ' + _esc(folder.duration) + ' total</div>' +
           '<div class="u-text-muted">~' + Math.ceil(folder.files * 1.5) + ' steps/epoch</div>' +
           '<div id="full-pp-status" class="' + ppCls + '">' + ppT + '</div>';

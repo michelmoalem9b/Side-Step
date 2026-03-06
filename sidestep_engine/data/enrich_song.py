@@ -89,6 +89,13 @@ def enrich_one(
                 result["status"] = "skipped"
                 return result
 
+        # Per-field skip helper: for fill_missing, check if field(s) exist
+        _has = lambda *keys: (
+            policy == "fill_missing"
+            and existing
+            and all(existing.get(k, "").strip() for k in keys)
+        )
+
         artist, title = parse_filename(audio_path)
         if not artist:
             artist = default_artist
@@ -96,7 +103,7 @@ def enrich_one(
         new_fields: Dict[str, str] = {}
 
         # Local audio analysis (BPM, key, time signature)
-        if audio_analyze_fn:
+        if audio_analyze_fn and not _has("bpm", "key", "signature"):
             try:
                 analysis = audio_analyze_fn(audio_path)
                 if analysis:
@@ -107,7 +114,7 @@ def enrich_one(
                 warnings.append(f"Audio analysis error: {exc}")
 
         # Fetch lyrics
-        if lyrics_fn:
+        if lyrics_fn and not _has("lyrics"):
             try:
                 lookup_artist = artist or ""
                 raw_lyrics = lyrics_fn(lookup_artist, title)
@@ -123,7 +130,7 @@ def enrich_one(
                 warnings.append(f"Lyrics error: {exc}")
 
         # Generate caption + structured metadata
-        if caption_fn:
+        if caption_fn and not _has("caption"):
             try:
                 lyrics_excerpt = (
                     new_fields.get("lyrics")

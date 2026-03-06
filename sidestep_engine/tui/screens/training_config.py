@@ -674,7 +674,7 @@ class TrainingConfigScreen(Screen):
                 yield Input(
                     value="2",
                     id="input-prefetch-factor",
-                    validators=[Number(minimum=1, maximum=16)],
+                    validators=[Number(minimum=0, maximum=16)],
                     classes="form-input",
                 )
             yield Static("DataLoader prefetch multiplier (default: 2)", classes="form-hint")

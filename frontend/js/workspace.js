@@ -479,8 +479,11 @@ document.addEventListener("keydown", (e) => {
     }
 
     $("btn-start-ez")?.addEventListener("click", () => {
-      if (typeof Validation !== 'undefined' && !Validation.validateAll()) {
-        showToast("Fix validation errors before starting", "error"); return;
+      if (typeof Validation !== 'undefined') {
+        const result = Validation.validateAll();
+        if (result !== true) {
+          showToast(result.slice(0, 3).join(' \u00b7 '), "error"); return;
+        }
       }
       const config = typeof WorkspaceConfig !== 'undefined' ? WorkspaceConfig.gatherFullConfig() : {};
       const adapter = document.querySelector('input[name="ez-adapter"]:checked')?.value || config.adapter_type || "lora";
@@ -508,9 +511,12 @@ document.addEventListener("keydown", (e) => {
     });
 
     $("btn-start-full")?.addEventListener("click", () => {
-      if (typeof Validation !== 'undefined' && !Validation.validateAll()) {
-        showToast("Fix validation errors before starting", "error");
-        return;
+      if (typeof Validation !== 'undefined') {
+        const result = Validation.validateAll();
+        if (result !== true) {
+          showToast(result.slice(0, 3).join(' \u00b7 '), "error");
+          return;
+        }
       }
       const config = typeof WorkspaceConfig !== 'undefined' ? WorkspaceConfig.gatherFullConfig() : {};
       config.run_name = (config.run_name || "run") + "_" + _timestamp();

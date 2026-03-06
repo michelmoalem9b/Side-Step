@@ -1278,7 +1278,7 @@
                     <p><strong>Simple:</strong> How many batches each worker pre-loads into memory ahead of time. Higher = smoother data pipeline but uses more RAM.</p>
                     <p>2 is the PyTorch default and works well for most setups.</p>
                   </div>
-                  <input class="input has-default" type="number" id="full-prefetch-factor" value="2" data-default="2" data-validate="gte:1 int">
+                  <input class="input has-default" type="number" id="full-prefetch-factor" value="2" data-default="2" data-validate="gte:0 int">
                   <div class="field-error"></div>
                 </div>
               </div>

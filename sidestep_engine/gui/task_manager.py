@@ -282,6 +282,21 @@ class TaskManager:
         except queue.Empty:
             return None
 
+    def drain_training_updates(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Drain up to *limit* messages from the training queue.
+
+        Returns a list so the WebSocket handler can send them in one
+        burst, reducing backpressure and ensuring progress messages
+        are not starved by verbose stdout logging.
+        """
+        batch: List[Dict[str, Any]] = []
+        for _ in range(limit):
+            try:
+                batch.append(self._training_queue.get_nowait())
+            except queue.Empty:
+                break
+        return batch
+
     def _tail_stdout(self, task: Task) -> None:
         """Read subprocess stdout line by line, detect OOM, push to queue."""
         assert task.process and task.process.stdout
@@ -321,15 +336,23 @@ class TaskManager:
                 task.status = "failed"
                 reason = reason or "CUDA out of memory"
 
-            try:
-                self._training_queue.put_nowait({
-                    "type": "status", "status": task.status,
-                    "exit_code": rc, "ts": time.time(),
-                    "oom": task.oom_detected,
-                    "reason": reason,
-                })
-            except queue.Full:
-                pass
+            status_msg = {
+                "type": "status", "status": task.status,
+                "exit_code": rc, "ts": time.time(),
+                "oom": task.oom_detected,
+                "reason": reason,
+            }
+            # Status is critical — force it into the queue even if full
+            for _attempt in range(20):
+                try:
+                    self._training_queue.put_nowait(status_msg)
+                    break
+                except queue.Full:
+                    try:
+                        self._training_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                    time.sleep(0.05)
             if task.config_file:
                 try:
                     os.unlink(task.config_file)
@@ -366,8 +389,19 @@ class TaskManager:
                         try:
                             data = _sanitize_floats(json.loads(line))
                             data["type"] = "progress"
-                            self._training_queue.put_nowait(data)
-                        except (json.JSONDecodeError, queue.Full):
+                            try:
+                                self._training_queue.put_nowait(data)
+                            except queue.Full:
+                                # Progress is critical — drop an old message to make room
+                                try:
+                                    self._training_queue.get_nowait()
+                                except queue.Empty:
+                                    pass
+                                try:
+                                    self._training_queue.put_nowait(data)
+                                except queue.Full:
+                                    pass
+                        except json.JSONDecodeError:
                             pass
                     else:
                         time.sleep(0.5)
@@ -381,8 +415,18 @@ class TaskManager:
                             try:
                                 data = _sanitize_floats(json.loads(line))
                                 data["type"] = "progress"
-                                self._training_queue.put_nowait(data)
-                            except (json.JSONDecodeError, queue.Full):
+                                try:
+                                    self._training_queue.put_nowait(data)
+                                except queue.Full:
+                                    try:
+                                        self._training_queue.get_nowait()
+                                    except queue.Empty:
+                                        pass
+                                    try:
+                                        self._training_queue.put_nowait(data)
+                                    except queue.Full:
+                                        pass
+                            except json.JSONDecodeError:
                                 pass
                     if _drain_pass == 0:
                         time.sleep(0.2)  # second pass catches late flushes

@@ -93,13 +93,30 @@ const Validation = (() => {
   // ---- Validate all fields ------------------------------------------------
 
   function validateAll() {
-    let valid = true;
+    const errors = [];
     document.querySelectorAll('[data-validate]').forEach((input) => {
       if (input.offsetParent === null) return; // skip hidden
       const err = validateField(input);
-      if (err) valid = false;
+      if (err) {
+        const label = _fieldLabel(input);
+        errors.push(label ? label + ': ' + err : err);
+      }
     });
-    return valid;
+    return errors.length === 0 ? true : errors;
+  }
+
+  function _fieldLabel(input) {
+    const group = input.closest('.form-group');
+    if (group) {
+      const lbl = group.querySelector('.form-group__label, label');
+      if (lbl) {
+        const clone = lbl.cloneNode(true);
+        clone.querySelectorAll('.help-icon, .toggle__track').forEach(e => e.remove());
+        const text = clone.textContent.trim().replace(/[:\s?]+$/, '');
+        if (text) return text;
+      }
+    }
+    return input.id || '';
   }
 
   // ---- Wire listeners -----------------------------------------------------
