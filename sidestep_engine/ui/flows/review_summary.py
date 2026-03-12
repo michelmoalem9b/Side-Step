@@ -133,6 +133,10 @@ _GROUPS_TEMPLATE: List[Tuple[str, List[Tuple[str, str]]]] = [
         ("save_best", "Save best model"),
         ("save_best_after", "Best-model tracking after"),
         ("early_stop_patience", "Early stop patience"),
+        ("target_loss", "Target loss"),
+        ("target_loss_floor", "Target loss LR floor"),
+        ("target_loss_warmup", "Cruise warmup steps"),
+        ("target_loss_smoothing", "Cruise smoothing (EMA β)"),
         ("resume_from", "Resume from"),
     ]),
     ("Logging", [

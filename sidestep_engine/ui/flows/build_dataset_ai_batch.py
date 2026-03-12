@@ -22,6 +22,22 @@ from sidestep_engine.ui.prompt_helpers import print_message, section
 logger = logging.getLogger(__name__)
 
 
+def _caption_generation_kwargs(values: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for source_key, target_key in (
+        ("_caption_temperature", "temperature"),
+        ("_caption_max_tokens", "max_tokens"),
+        ("_caption_top_p", "top_p"),
+        ("_caption_presence_penalty", "presence_penalty"),
+        ("_caption_frequency_penalty", "frequency_penalty"),
+        ("_caption_repetition_penalty", "repetition_penalty"),
+    ):
+        value = values.get(source_key)
+        if value is not None:
+            result[target_key] = value
+    return result
+
+
 def _resolve_or_prompt(
     existing: Optional[str], label: str, settings_key: str,
 ) -> Optional[str]:
@@ -98,6 +114,7 @@ def build_caption_fn(
     """
     provider = answers.get("caption_provider", "skip")
     key = answers.get("_caption_key")
+    generation_kwargs = _caption_generation_kwargs(answers)
 
     # Local providers don't need an API key
     if provider in ("local_8-10gb", "local_16gb"):
@@ -106,6 +123,10 @@ def build_caption_fn(
         return lambda title, artist, excerpt, audio_path: _local_cap(
             title, artist, audio_path=audio_path, lyrics_excerpt=excerpt,
             tier=tier,
+            max_new_tokens=generation_kwargs.get("max_tokens"),
+            temperature=generation_kwargs.get("temperature"),
+            top_p=generation_kwargs.get("top_p"),
+            repetition_penalty=generation_kwargs.get("repetition_penalty"),
         )
 
     if provider in ("skip", "lyrics_only") or not key:
@@ -117,6 +138,9 @@ def build_caption_fn(
         return lambda title, artist, excerpt, audio_path: generate_caption(
             title, artist, key, audio_path=audio_path, lyrics_excerpt=excerpt,
             model=gemini_model,
+            temperature=generation_kwargs.get("temperature"),
+            max_tokens=generation_kwargs.get("max_tokens"),
+            top_p=generation_kwargs.get("top_p"),
         )
 
     if provider == "openai":
@@ -125,6 +149,11 @@ def build_caption_fn(
             title, artist, key, audio_path=audio_path, lyrics_excerpt=excerpt,
             base_url=answers.get("_openai_base_url"),
             model=answers.get("_openai_model", DEFAULT_OPENAI_MODEL),
+            temperature=generation_kwargs.get("temperature"),
+            max_tokens=generation_kwargs.get("max_tokens"),
+            top_p=generation_kwargs.get("top_p"),
+            presence_penalty=generation_kwargs.get("presence_penalty"),
+            frequency_penalty=generation_kwargs.get("frequency_penalty"),
         )
 
     return None

@@ -8,35 +8,13 @@ for a single audio file.  Called in a loop by the wizard orchestrator.
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from sidestep_engine.data.audio_metadata import resolve_metadata, parse_filename
 from sidestep_engine.data.caption_config import parse_structured_response
 
 logger = logging.getLogger(__name__)
-
-# Common filename patterns: "Artist - Title", "Title"
-_FILENAME_RE = re.compile(r"^(.+?)\s*[-–—]\s*(.+)$")
-
-
-def parse_filename(audio_path: Path) -> tuple[str, str]:
-    """Extract artist and title from an audio filename.
-
-    Tries ``"Artist - Title"`` patterns first, falls back to using
-    the stem as the title with an empty artist.
-
-    Args:
-        audio_path: Path to the audio file.
-
-    Returns:
-        ``(artist, title)`` tuple.  Artist may be empty.
-    """
-    stem = audio_path.stem
-    match = _FILENAME_RE.match(stem)
-    if match:
-        return match.group(1).strip(), match.group(2).strip()
-    return "", stem.strip()
 
 
 def enrich_one(
@@ -89,14 +67,23 @@ def enrich_one(
                 result["status"] = "skipped"
                 return result
 
-        # Per-field skip helper: for fill_missing, check if field(s) exist
+        # Per-field skip helper: avoid unnecessary API calls when fields
+        # already exist and the current policy would not overwrite them.
+        #   fill_missing      → skip if ALL requested fields are populated
+        #   overwrite_caption → skip if fields are populated AND none of
+        #                       the requested fields is "caption"
+        #   overwrite_all     → never skip (always regenerate)
         _has = lambda *keys: (
-            policy == "fill_missing"
-            and existing
+            existing
             and all(existing.get(k, "").strip() for k in keys)
+            and (
+                policy == "fill_missing"
+                or (policy == "overwrite_caption" and "caption" not in keys)
+            )
         )
 
-        artist, title = parse_filename(audio_path)
+        meta = resolve_metadata(audio_path)
+        artist, title = meta.artist, meta.title
         if not artist:
             artist = default_artist
 
@@ -143,6 +130,17 @@ def enrich_one(
                 else:
                     warnings.append("Caption returned empty")
             except Exception as exc:
+                try:
+                    from sidestep_engine.data.caption_provider_local import LocalCaptionOOMError
+                except Exception:
+                    LocalCaptionOOMError = None  # type: ignore[assignment]
+
+                if LocalCaptionOOMError is not None and isinstance(exc, LocalCaptionOOMError):
+                    logger.warning("Local caption OOM for %s: %s", audio_path.name, exc)
+                    result["status"] = "failed"
+                    result["error"] = str(exc)
+                    result["error_code"] = "local_caption_oom"
+                    return result
                 logger.warning("Caption generation failed for %s: %s",
                                audio_path.name, exc)
                 warnings.append(f"Caption error: {exc}")

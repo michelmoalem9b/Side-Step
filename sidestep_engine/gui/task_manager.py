@@ -453,7 +453,7 @@ class TaskManager:
                     audio_dir=config.get("audio_dir"),
                     output_dir=config.get("output_dir") or config.get("tensor_output", ""),
                     checkpoint_dir=config.get("checkpoint_dir", ""),
-                    variant=config.get("model_variant", "turbo"),
+                    variant=config.get("model_variant", "base"),
                     max_duration=config.get("max_duration", 0),
                     dataset_json=config.get("dataset_json"),
                     device=config.get("device", "auto"),
@@ -507,7 +507,7 @@ class TaskManager:
                 result = run_fisher_analysis(
                     checkpoint_dir=config.get("checkpoint_dir", ""),
                     dataset_dir=config.get("dataset_dir", ""),
-                    variant=config.get("model_variant", "turbo"),
+                    variant=config.get("model_variant", "base"),
                     base_rank=int(config.get("base_rank", config.get("rank", 64))),
                     rank_min=int(config.get("rank_min", 16)),
                     rank_max=int(config.get("rank_max", 128)),
@@ -574,15 +574,31 @@ class TaskManager:
                     if provider in ("skip", "lyrics_only"):
                         return None
 
+                    generation_keys = (
+                        ("caption_temperature", "temperature"),
+                        ("caption_max_tokens", "max_tokens"),
+                        ("caption_top_p", "top_p"),
+                        ("caption_presence_penalty", "presence_penalty"),
+                        ("caption_frequency_penalty", "frequency_penalty"),
+                        ("caption_repetition_penalty", "repetition_penalty"),
+                    )
+                    generation_kwargs = {
+                        target: config.get(source)
+                        for source, target in generation_keys
+                        if config.get(source) is not None
+                    }
+
                     if provider == "gemini":
                         from sidestep_engine.data.caption_provider_gemini import (
                             generate_caption as _generate,
                         )
 
-                        key = str(config.get("gemini_key") or config.get("api_key") or "")
+                        key = str(config.get("gemini_key") or config.get("api_key") or "").strip()
                         model = config.get("gemini_model") or config.get("model")
                         if not key:
                             return None
+
+                        use_google_search = bool(config.get("gemini_google_search"))
 
                         def _run_caption(
                             title: str,
@@ -593,6 +609,8 @@ class TaskManager:
                             kwargs: Dict[str, Any] = {
                                 "audio_path": audio_path,
                                 "lyrics_excerpt": excerpt,
+                                "google_search": use_google_search,
+                                **generation_kwargs,
                             }
                             if model:
                                 kwargs["model"] = model
@@ -605,7 +623,7 @@ class TaskManager:
                             generate_caption as _generate,
                         )
 
-                        key = str(config.get("openai_key") or config.get("api_key") or "")
+                        key = str(config.get("openai_key") or config.get("api_key") or "").strip()
                         model = config.get("openai_model") or config.get("model")
                         base_url = config.get("openai_base") or config.get("base_url")
                         if not key:
@@ -620,6 +638,7 @@ class TaskManager:
                             kwargs: Dict[str, Any] = {
                                 "audio_path": audio_path,
                                 "lyrics_excerpt": excerpt,
+                                **generation_kwargs,
                             }
                             if model:
                                 kwargs["model"] = model
@@ -635,6 +654,9 @@ class TaskManager:
                         )
 
                         tier = "8-10gb" if provider == "local_8-10gb" else "16gb"
+                        allow_cpu_offload = bool(config.get("caption_local_cpu_offload"))
+
+                        _cancel = task.cancel_flag
 
                         def _run_caption(
                             title: str,
@@ -647,6 +669,12 @@ class TaskManager:
                                 audio_path=audio_path,
                                 lyrics_excerpt=excerpt,
                                 tier=tier,
+                                max_new_tokens=generation_kwargs.get("max_tokens"),
+                                temperature=generation_kwargs.get("temperature"),
+                                top_p=generation_kwargs.get("top_p"),
+                                repetition_penalty=generation_kwargs.get("repetition_penalty"),
+                                allow_cpu_offload=allow_cpu_offload,
+                                stop_event=_cancel,
                             )
 
                         return _run_caption
@@ -654,7 +682,8 @@ class TaskManager:
                     raise ValueError(f"Unknown caption provider: {provider}")
 
                 def _build_lyrics_fn() -> Optional[Callable[[str, str], Optional[str]]]:
-                    token = str(config.get("genius_token") or "").strip()
+                    token = str(config.get("genius_token") or "")
+                    token = token.encode("ascii", "ignore").decode("ascii").strip()
                     if not token:
                         return None
 
@@ -699,6 +728,34 @@ class TaskManager:
                     msg = f"{af.name}: {status}"
                     if status == "failed" and result.get("error"):
                         msg = f"{af.name}: failed ({result.get('error')})"
+                    elif result.get("warnings"):
+                        msg = f"{af.name}: {status} ({'; '.join(result['warnings'])})"
+
+                    if result.get("error_code") == "local_caption_oom":
+                        task.oom_detected = True
+                        task.failure_reason = str(result.get("error") or "Local caption OOM")
+                        _push(
+                            task,
+                            i,
+                            total,
+                            msg,
+                            written=stats["written"],
+                            skipped=stats["skipped"],
+                            failed=stats["failed"],
+                            error_code="local_caption_oom",
+                        )
+                        task.cancel_flag.set()
+                        task.status = "failed"
+                        _push_event(
+                            task,
+                            "fail",
+                            task.failure_reason,
+                            result={**stats, "total": total},
+                            error_code="local_caption_oom",
+                            path=str(af),
+                            fatal=True,
+                        )
+                        return
 
                     _push(
                         task,

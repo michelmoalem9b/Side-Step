@@ -5,6 +5,45 @@ const WorkspaceLab = (() => {
 
   const _e = window._esc;
 
+  async function _notifyDesktop(title, body) {
+    const bridge = window.sidestepElectron;
+    if (bridge && typeof bridge.notify === "function") {
+      try {
+        await bridge.notify(String(title || "Side-Step"), String(body || ""));
+        return true;
+      } catch (err) {
+        console.warn("[notify] electron notification failed:", err);
+      }
+    }
+
+    if (typeof Notification === "undefined") return false;
+    try {
+      if (Notification.permission === "granted") {
+        new Notification(String(title || "Side-Step"), { body: String(body || "") });
+        return true;
+      }
+      if (Notification.permission !== "denied") {
+        const perm = await Notification.requestPermission();
+        if (perm === "granted") {
+          new Notification(String(title || "Side-Step"), { body: String(body || "") });
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn("[notify] browser notification failed:", err);
+    }
+    return false;
+  }
+
+  function _showCaptionOOMAlert(message) {
+    const text = String(message || "Local captioning ran out of GPU memory. Enable CPU offload or switch tiers.");
+    if (typeof WorkspaceBehaviors !== "undefined" && WorkspaceBehaviors.showConfirmModal) {
+      WorkspaceBehaviors.showConfirmModal("Local Caption OOM", text, "OK", () => {}, () => {});
+      return;
+    }
+    alert(text);
+  }
+
   /* ---- Shared task WS streaming ---- */
   const _tasks = {};  // { pp: { ws, taskId }, ppplus: ..., captions: ... }
   let _resumeBaseConfig = null;
@@ -692,6 +731,8 @@ const WorkspaceLab = (() => {
         genius_token: $("settings-genius-token")?.value,
         default_artist: $("caption-default-artist")?.value,
         dataset_dir: $("lab-dataset-path")?.value,
+        caption_local_cpu_offload: !!$("caption-local-cpu-offload")?.checked,
+        gemini_google_search: !!$("caption-gemini-google-search")?.checked,
       };
       if (selectedPaths.length) {
         config.audio_files = selectedPaths;
@@ -708,6 +749,13 @@ const WorkspaceLab = (() => {
       const _finish = (msg) => {
         $("btn-run-captions").style.display = "inline-block";
         $("btn-stop-captions").style.display = "none";
+        if (msg?.error_code === "local_caption_oom") {
+          const reason = msg?.msg || msg?.error || "Local captioning ran out of GPU memory. Enable CPU offload or switch tiers.";
+          showToast("AI Captions cancelled due to local OOM", "error");
+          _showCaptionOOMAlert(reason);
+          _notifyDesktop("Side-Step: Local Caption OOM", reason).catch(() => {});
+          return;
+        }
         if (msg && msg.type === "cancelled") { showToast("AI Captions cancelled", "warn"); return; }
         const payload = msg?.result || msg || {};
         if (payload.written != null) written = payload.written;
@@ -841,6 +889,9 @@ const WorkspaceLab = (() => {
     _syncCanonicalAudioPaths();
     document.addEventListener("sidestep:settings-saved", () => {
       _syncCanonicalAudioPaths();
+      // Sync settings model into caption panel
+      const gm = $("settings-gemini-model")?.value;
+      if (gm) { const el = $("caption-gemini-model"); if (el) el.value = gm; }
     });
     document.addEventListener("sidestep:dataset-scanned", () => {
       _updateCaptionButtonStates();
