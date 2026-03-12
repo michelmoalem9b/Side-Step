@@ -339,7 +339,10 @@ def _extract_from_mapping_blob_text(text: str) -> dict[str, str]:
         return {}
 
     patterns = {
-        "caption": [r'''[\'\"]caption[\'\"]\s*:\s*(["\'])(.*?)\1'''],
+        "caption": [
+            r'''[\'\"]caption[\'\"]\s*:\s*"((?:[^"\\]|\\.)*)"''',
+            r"""[\'\"]caption[\'\"]\s*:\s*'((?:[^'\\]|\\.)*)'""",
+        ],
         "genre": [
             r'''[\'\"]genres[\'\"]\s*:\s*\[([^\]]+)\]''',
             r'''[\'\"]genre[\'\"]\s*:\s*[\'\"]([^\'\"]+)[\'\"]''',
