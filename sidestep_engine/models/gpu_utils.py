@@ -118,6 +118,44 @@ def detect_gpu(requested_device: str = "auto", requested_precision: str = "auto"
     )
 
 
+def clear_device_cache(device: Optional[str] = None) -> None:
+    """Free cached memory on any accelerator (CUDA / MPS / XPU).
+
+    If *device* is ``None``, clears all available backends.  Otherwise
+    only the backend matching *device* (e.g. ``"cuda:0"``, ``"mps"``) is
+    cleared.
+    """
+    import gc
+    gc.collect()
+
+    dev_type = device.split(":")[0] if device else None
+
+    if dev_type in (None, "cuda") and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    if dev_type in (None, "mps") and hasattr(torch, "mps"):
+        try:
+            torch.mps.empty_cache()
+        except Exception:
+            pass
+    if dev_type in (None, "xpu") and hasattr(torch, "xpu") and torch.xpu.is_available():
+        try:
+            torch.xpu.empty_cache()
+        except Exception:
+            pass
+
+
+def seed_all_devices(seed: int) -> None:
+    """Seed RNG on all available backends (CPU + CUDA/MPS/XPU)."""
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    if hasattr(torch, "mps") and hasattr(torch.mps, "manual_seed"):
+        try:
+            torch.mps.manual_seed(seed)
+        except Exception:
+            pass
+
+
 def _cuda_free_mb(idx: int = 0) -> Optional[float]:
     """Return free CUDA memory in MiB, or None on failure."""
     try:

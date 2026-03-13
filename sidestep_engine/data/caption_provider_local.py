@@ -68,9 +68,8 @@ class _CancelCriteria:
 # ── Helpers ─────────────────────────────────────────────────────────
 
 def _clear_cuda_memory() -> None:
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+    from sidestep_engine.models.gpu_utils import clear_device_cache
+    clear_device_cache()
 
 
 def _resolve_local_generation_settings(
@@ -265,9 +264,10 @@ def _resolve_model_path() -> str:
 
 
 def _pick_dtype() -> torch.dtype:
-    """Pick bf16 on Ampere+ GPUs, fall back to fp16."""
+    """Pick bf16 on Ampere+ GPUs, fp16 for MPS / older CUDA."""
     if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
         return torch.bfloat16
+    # MPS does not support bf16 -- use fp16
     return torch.float16
 
 
@@ -301,6 +301,7 @@ def _resolve_input_device(model: Any) -> torch.device:
 def _pick_attention_backend() -> Optional[str]:
     """Pick the most memory-efficient supported attention backend available."""
     if not torch.cuda.is_available():
+        # MPS / CPU use PyTorch's built-in SDPA -- no flash_attn needed
         return None
     if importlib.util.find_spec("flash_attn") is None:
         return None
@@ -351,6 +352,8 @@ def _load_model(tier: str, *, allow_cpu_offload: bool = False) -> None:
 
     if torch.cuda.is_available():
         load_kwargs["device_map"] = "auto" if allow_cpu_offload else {"": "cuda:0"}
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        load_kwargs["device_map"] = "auto" if allow_cpu_offload else {"": "mps"}
     else:
         load_kwargs["device_map"] = "cpu"
 

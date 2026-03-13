@@ -33,13 +33,11 @@ from sidestep_engine.core.trainer import FixedLoRATrainer
 
 def _cleanup_gpu() -> None:
     """Release GPU memory so the process can safely reuse it."""
-    gc.collect()
     try:
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        from sidestep_engine.models.gpu_utils import clear_device_cache
+        clear_device_cache()
     except ImportError:
-        pass
+        gc.collect()
 
 
 def _safe_slug(text: str) -> str:
@@ -126,8 +124,13 @@ def run_fixed(args: argparse.Namespace) -> int:
         set_plain_mode(True)
 
     # -- GPU pre-flight --------------------------------------------------------
-    if not torch.cuda.is_available():
-        print("[FAIL] No CUDA GPU detected. Training requires a CUDA-capable GPU.", file=sys.stderr)
+    from sidestep_engine.models.gpu_utils import detect_gpu
+    gpu_info = detect_gpu()
+    if gpu_info.device_type == "cpu":
+        print(
+            "[FAIL] No GPU detected. Training requires a CUDA, MPS (Apple Silicon), or XPU GPU.",
+            file=sys.stderr,
+        )
         return 1
 
     # -- Matmul precision (matches handler.initialize_service behaviour) ------

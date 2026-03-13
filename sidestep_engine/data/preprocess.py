@@ -450,8 +450,8 @@ def _pass1_light(
                 # Free GPU tensors from this iteration before the next one
                 del target_latents, attention_mask, text_hs, text_mask
                 del lyric_hs, lyric_mask
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                from sidestep_engine.models.gpu_utils import clear_device_cache
+                clear_device_cache()
 
                 intermediates.append(tmp_path)
                 logger.debug("[Side-Step] Pass 1 OK: %s", af.name)
@@ -590,8 +590,8 @@ def _pass2_heavy(
 
                 # Free all GPU tensors and the loaded data dict before next iter
                 del encoder_hs, encoder_mask, context_latents, data
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                from sidestep_engine.models.gpu_utils import clear_device_cache
+                clear_device_cache()
 
                 # Remove intermediate
                 tmp_path.unlink(missing_ok=True)

@@ -51,9 +51,8 @@ def compute_spectral_complexity(
             logger.warning("SVD failed for %s: %s -- skipping spectral data", name, exc)
             results[name] = -1  # sentinel for "unknown"
         finally:
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            from sidestep_engine.models.gpu_utils import clear_device_cache
+            clear_device_cache()
 
         if (idx + 1) % 50 == 0 or idx == total - 1:
             logger.debug("Spectral analysis: %d/%d modules done", idx + 1, total)

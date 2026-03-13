@@ -570,10 +570,11 @@ def run_basic_training_loop(
                     tb.close()
                     return
 
-                # Periodic CUDA cache cleanup to prevent intra-epoch
+                # Periodic cache cleanup to prevent intra-epoch
                 # memory fragmentation on consumer GPUs.
-                if torch.cuda.is_available() and global_step % cfg.log_every == 0:
-                    torch.cuda.empty_cache()
+                if global_step % cfg.log_every == 0:
+                    from sidestep_engine.models.gpu_utils import clear_device_cache
+                    clear_device_cache()
 
         # Flush remainder
         if accumulation_step > 0:
@@ -727,10 +728,10 @@ def run_basic_training_loop(
                 checkpoint_path=ckpt_dir,
             )
 
-        # Clear CUDA cache AFTER checkpoint save so serialization
+        # Clear device cache AFTER checkpoint save so serialization
         # temporaries are also freed.
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        from sidestep_engine.models.gpu_utils import clear_device_cache
+        clear_device_cache()
 
     # -- Sanity check: did we actually train? ----------------------------
     if global_step == 0:

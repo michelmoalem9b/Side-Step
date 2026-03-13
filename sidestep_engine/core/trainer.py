@@ -161,10 +161,9 @@ class FixedLoRATrainer:
 
             # -- Seed (may be overridden by checkpoint RNG restore) ----------
             self._rng_seeded_fresh = True
-            torch.manual_seed(cfg.seed)
+            from sidestep_engine.models.gpu_utils import seed_all_devices
+            seed_all_devices(cfg.seed)
             random.seed(cfg.seed)
-            if torch.cuda.is_available():
-                torch.cuda.manual_seed_all(cfg.seed)
 
             # -- Build module -----------------------------------------------
             device = torch.device(cfg.device)
@@ -473,8 +472,8 @@ class FixedLoRATrainer:
             offloaded = offload_non_decoder(self.module.model)
             if offloaded:
                 yield TrainingUpdate(0, 0.0, f"[INFO] Offloaded {offloaded} model components to CPU (saves VRAM)", kind="info")
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                from sidestep_engine.models.gpu_utils import clear_device_cache
+                clear_device_cache()
 
         # -- dtype / Fabric setup -------------------------------------------
         self.module.model = self.module.model.to(self.module.dtype)
@@ -839,10 +838,11 @@ class FixedLoRATrainer:
                                     checkpoint_path=best_path,
                                 )
 
-                    # Periodic CUDA cache cleanup to prevent intra-epoch
+                    # Periodic cache cleanup to prevent intra-epoch
                     # memory fragmentation on consumer GPUs.
-                    if torch.cuda.is_available() and global_step % cfg.log_every == 0:
-                        torch.cuda.empty_cache()
+                    if global_step % cfg.log_every == 0:
+                        from sidestep_engine.models.gpu_utils import clear_device_cache
+                        clear_device_cache()
 
             # Flush remainder
             if accumulation_step > 0:
@@ -1023,10 +1023,10 @@ class FixedLoRATrainer:
                     checkpoint_path=ckpt_dir,
                 )
 
-            # Clear CUDA cache AFTER checkpoint save so serialization
+            # Clear device cache AFTER checkpoint save so serialization
             # temporaries are also freed.
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            from sidestep_engine.models.gpu_utils import clear_device_cache
+            clear_device_cache()
 
         # -- Sanity check: did we actually train? ----------------------------
         if global_step == 0:
