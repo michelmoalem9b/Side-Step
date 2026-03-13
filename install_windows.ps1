@@ -36,7 +36,7 @@ Write-Host "  ███████ ██ ██   ██ █████   █
 Write-Host "       ██ ██ ██   ██ ██                 ██    ██    ██      ██" -ForegroundColor Cyan
 Write-Host "  ███████ ██ ██████  ███████       ███████    ██    ███████ ██" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Installer (v1.1.0-beta)" -ForegroundColor Green
+Write-Host "  Installer (v1.1.1-beta)" -ForegroundColor Green
 Write-Host ""
 
 # ── Pre-flight ───────────────────────────────────────────────────────────

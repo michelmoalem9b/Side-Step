@@ -14,11 +14,11 @@
 **Standalone training toolkit for ACE-Step 1.5 audio generation models.**
 Takes you from raw audio files to a working adapter without the friction. Variant-aware multi-adapter fine-tuning (LoRA, DoRA, LoKR, LoHA, OFT) with auto-detection, low-VRAM support, and three ways to work.
 
-> **Status:** v1.1.0-beta -- Stable enough for daily use. Some features are still experimental. This is maintained by one person only; if you encounter an issue, please let me know in the issues tab.
+> **Status:** v1.1.1-beta -- Stable enough for daily use. Some features are still experimental. This is maintained by one person only; if you encounter an issue, please let me know in the issues tab.
 
 ## Why Side-Step?
 
-Side-Step auto-detects your model variant (base, sft, or turbo), selects the scientifically correct training schedule, and runs on consumer hardware down to 8 GB VRAM. Version 1.1.0 adds cruise control training, a completely overhauled captioning pipeline, and polished presets — building on the full standalone suite introduced in 1.0.0.
+Side-Step auto-detects your model variant (base, sft, or turbo), selects the scientifically correct training schedule, and runs on consumer hardware down to 8 GB VRAM. Version 1.1.1 adds Music Flamingo/Transcriber Server providers, batched caption jobs, real-time TensorBoard-parity charts, and training pipeline improvements — building on the full standalone suite introduced in 1.0.0.
 
 ### What was already here
 
@@ -56,6 +56,19 @@ Side-Step auto-detects your model variant (base, sft, or turbo), selects the sci
 - **Linux Desktop Integration** -- `.desktop` file and icon installed to XDG standard locations by the Linux installer. Side-Step appears in your application menu with its own icon.
 - **Electron Hardening** -- Navigation guard prevents blank-page crashes, renderer crash detection, DevTools shortcut (F12), native desktop notifications for training completion.
 - **Prompt Helpers Fix** -- `ask()` now correctly casts default values through `type_fn`, fixing numeric wizard defaults that were silently returned as strings.
+
+### New in 1.1.1
+
+- **Music Flamingo Provider** -- Use Music Flamingo as a metadata and/or lyrics provider. Supports local servers via configurable URL and remote Hugging Face endpoints with token authentication.
+- **Transcriber Server Provider** -- Dedicated lyrics provider backed by a configurable Transcriber Server URL. Nested response parsing, multipart transport, and automatic fallback handling.
+- **Batched Caption Jobs** -- The GUI, Wizard, and CLI now run caption generation as batched jobs. Multiple audio files are queued and processed in sequence with per-file progress, automatic retries, and cancellation support. No more one-at-a-time blocking.
+- **Overwrite-Lyrics-Only Mode** -- Update only the lyrics field in existing sidecars without touching the rest of the metadata. Useful when re-running lyrics with a different provider.
+- **Explicit Sequence Crop Controls** -- Choose between full sample, chunk by seconds, or max latent length. Backend, presets, UI, and VRAM estimation all support the new modes.
+- **Turbo Training Overhaul** -- Replaced the old discrete 8-step Turbo schedule with continuous logit-normal timestep sampling and re-enabled CFG dropout. Turbo LoRA training now follows a proper training-oriented distribution.
+- **Cruise Control Progress** -- Target loss scale and EMA are now reported in the progress file, visible in the GUI monitor.
+- **TensorBoard-Parity Charts** -- The GUI training monitor now matches TensorBoard's smoothing algorithm, y-domain (P5-P95 with nice boundaries), grid counts, scroll zoom, pan, and closest-point finding. No external TensorBoard needed.
+- **CLI / Wizard / GUI Parity** -- All new features (crop modes, provider selection, endpoint URLs, HF token) are available across all three interfaces.
+- **Bug Fixes** -- `dtype` → `torch_dtype` in all `from_pretrained` calls (models were loading in default precision), LR restore on gradient flush path, caption regex truncation on apostrophes, faster TensorBoard flush (5s vs 30s), and several provider integration fixes.
 
 ---
 
@@ -194,6 +207,14 @@ Generate rich sidecar metadata for your audio files.
 uv run sidestep captions \
     --audio-dir ./my_songs \
     --provider local_16gb       # or gemini, openai, lyrics_only
+
+# With Music Flamingo metadata + Transcriber Server lyrics:
+uv run sidestep captions \
+    --audio-dir ./my_songs \
+    --metadata-provider music_flamingo \
+    --lyrics-provider transcriber_server \
+    --music-flamingo-url http://localhost:5000 \
+    --transcriber-server-url http://localhost:8000
 ```
 
 ### Export to ComfyUI
@@ -237,7 +258,7 @@ Run `uv run sidestep --help` for full details.
 
 Side-Step ensures your fine-tuning matches the base model's original training distribution:
 
-1. **Turbo models** -- Discrete 8-step sampling (matching inference).
+1. **Turbo models** -- Continuous logit-normal sampling + CFG dropout (as of v1.1.1; previously used discrete 8-step).
 2. **Base/SFT models** -- Continuous logit-normal sampling + CFG dropout (matching training).
 
 The upstream trainer often forces the Turbo schedule on all models, which is incorrect for Base/SFT. Side-Step detects and fixes this automatically.
