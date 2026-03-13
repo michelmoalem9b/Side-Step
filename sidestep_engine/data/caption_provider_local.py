@@ -271,6 +271,33 @@ def _pick_dtype() -> torch.dtype:
     return torch.float16
 
 
+def _resolve_input_device(model: Any) -> torch.device:
+    """Return the device holding the model's input embeddings.
+
+    ``model.device`` is unreliable with Accelerate ``device_map`` and
+    4-bit quantization.  transformers >=4.57 removed the automatic
+    ``get_input_embeddings`` for ``Qwen2_5OmniForConditionalGeneration``
+    so we walk the ``thinker → model`` chain manually as a fallback.
+    """
+    # 1. Standard path (works on transformers <4.57 and most other models)
+    try:
+        return model.get_input_embeddings().weight.device
+    except (NotImplementedError, AttributeError):
+        pass
+
+    # 2. Qwen2.5-Omni specific: thinker.model.embed_tokens
+    thinker = getattr(model, "thinker", None)
+    if thinker is not None:
+        inner = getattr(thinker, "model", None)
+        if inner is not None:
+            embed = getattr(inner, "embed_tokens", None)
+            if embed is not None:
+                return embed.weight.device
+
+    # 3. Last resort
+    return next(model.parameters()).device
+
+
 def _pick_attention_backend() -> Optional[str]:
     """Pick the most memory-efficient supported attention backend available."""
     if not torch.cuda.is_available():
@@ -475,10 +502,7 @@ def generate_caption(
                     padding=True,
                     use_audio_in_video=False,
                 )
-                # Qwen Omni expects runtime tensors on the same device as the
-                # input embedding weights.  ``_model.device`` is unreliable
-                # with Accelerate device_map and 4-bit quantization.
-                input_device = _model.get_input_embeddings().weight.device
+                input_device = _resolve_input_device(_model)
                 inputs = inputs.to(input_device)
                 if idx > 0:
                     logger.warning(
