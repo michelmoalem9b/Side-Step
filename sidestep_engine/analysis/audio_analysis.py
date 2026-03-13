@@ -164,11 +164,14 @@ _PITCH_CLASSES = [
 
 def _flush_vram() -> None:
     """Release GPU memory between pipeline stages."""
+    gc.collect()
     try:
-        from sidestep_engine.models.gpu_utils import clear_device_cache
-        clear_device_cache()
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
     except ImportError:
-        gc.collect()
+        pass
 
 
 def _resolve_device(device: str = "auto") -> str:

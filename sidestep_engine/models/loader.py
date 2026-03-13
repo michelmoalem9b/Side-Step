@@ -341,8 +341,9 @@ def cleanup_preprocessing_models(models: Dict[str, Any]) -> None:
                 pass
         del obj
 
-    from sidestep_engine.models.gpu_utils import clear_device_cache
-    clear_device_cache()
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     logger.info("[OK] Preprocessing models cleaned up")
 
 
@@ -501,6 +502,7 @@ def unload_models(*models: Any) -> None:
                 pass
         del obj
 
-    from sidestep_engine.models.gpu_utils import clear_device_cache
-    clear_device_cache()
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     logger.info("[OK] Models unloaded and GPU cache cleared")

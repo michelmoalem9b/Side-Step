@@ -32,30 +32,14 @@ def run_encoder(
     else:
         refer_audio_order_mask = refer_audio_order_mask.to(device=device, dtype=torch.long)
 
-    # On MPS, pure fp16 encoder passes overflow in attention/layernorm.
-    # torch.autocast promotes sensitive ops to fp32 automatically.
-    dev_type = device.split(":")[0] if isinstance(device, str) else device.type if hasattr(device, "type") else "cpu"
-    use_autocast = dev_type == "mps"
-
     with torch.no_grad():
-        if use_autocast:
-            with torch.autocast("mps", dtype=torch.float16):
-                encoder_hidden_states, encoder_attention_mask = model.encoder(
-                    text_hidden_states=text_hidden_states.float(),
-                    text_attention_mask=text_attention_mask,
-                    lyric_hidden_states=lyric_hidden_states.float(),
-                    lyric_attention_mask=lyric_attention_mask,
-                    refer_audio_acoustic_hidden_states_packed=refer_audio_hidden.float(),
-                    refer_audio_order_mask=refer_audio_order_mask,
-                )
-        else:
-            encoder_hidden_states, encoder_attention_mask = model.encoder(
-                text_hidden_states=text_hidden_states,
-                text_attention_mask=text_attention_mask,
-                lyric_hidden_states=lyric_hidden_states,
-                lyric_attention_mask=lyric_attention_mask,
-                refer_audio_acoustic_hidden_states_packed=refer_audio_hidden,
-                refer_audio_order_mask=refer_audio_order_mask,
-            )
+        encoder_hidden_states, encoder_attention_mask = model.encoder(
+            text_hidden_states=text_hidden_states,
+            text_attention_mask=text_attention_mask,
+            lyric_hidden_states=lyric_hidden_states,
+            lyric_attention_mask=lyric_attention_mask,
+            refer_audio_acoustic_hidden_states_packed=refer_audio_hidden,
+            refer_audio_order_mask=refer_audio_order_mask,
+        )
 
     return encoder_hidden_states, encoder_attention_mask

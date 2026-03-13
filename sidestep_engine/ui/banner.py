@@ -102,10 +102,6 @@ def _get_versions() -> dict:
         info["PyTorch"] = torch.__version__
         if torch.cuda.is_available():
             info["CUDA"] = torch.version.cuda or "n/a"
-        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            info["Backend"] = "MPS (Apple Silicon)"
-        elif hasattr(torch, "xpu") and torch.xpu.is_available():
-            info["Backend"] = "Intel XPU"
     except ImportError:
         info["PyTorch"] = "not installed"
     try:

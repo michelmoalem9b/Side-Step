@@ -266,8 +266,9 @@ def run_fisher_analysis(
         logger.warning("Could not offload non-decoder components: %s", exc)
 
     # Free GPU memory released by offloading
-    from sidestep_engine.models.gpu_utils import clear_device_cache
-    clear_device_cache()
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     # Enable gradient checkpointing -- critical for VRAM.
     # Try multiple approaches since the bare model (no PEFT/Fabric wrappers)

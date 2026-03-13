@@ -394,5 +394,11 @@ def _make_autocast(device: torch.device, dtype: torch.dtype):
 
 
 def _clear_cache(device: torch.device) -> None:
-    from sidestep_engine.models.gpu_utils import clear_device_cache
-    clear_device_cache(str(device))
+    gc.collect()
+    dev = str(device)
+    if "cuda" in dev and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    elif "mps" in dev and hasattr(torch, "mps"):
+        torch.mps.empty_cache()
+    elif "xpu" in dev and hasattr(torch, "xpu"):
+        torch.xpu.empty_cache()
