@@ -76,7 +76,10 @@ class AdapterEMA:
         """Copy EMA shadow weights into the model (for eval / save).
 
         Call :meth:`restore` afterwards to resume training with raw weights.
+        If EMA tracking hasn't started yet, this is a no-op.
         """
+        if not self._active:
+            return
         if self._backup:
             raise RuntimeError(
                 "apply() called while a previous apply() is still active — "
