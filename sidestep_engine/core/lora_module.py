@@ -196,6 +196,24 @@ class FixedLoRAModule(nn.Module):
         self._cfg_ratio = training_config.cfg_ratio
         self._loss_weighting = training_config.loss_weighting
         self._snr_gamma = training_config.snr_gamma
+        self._loss_fn = training_config.loss_fn
+        self._huber_delta = training_config.huber_delta
+        self._channel_balance = training_config.channel_balance
+        self._vae_channel_prior = training_config.vae_channel_prior
+        self._latent_noise_scale = training_config.latent_noise
+        self._t_bias = training_config.t_bias
+        self._legacy_loss = training_config.legacy_loss
+
+        # Legacy mode overrides: revert everything to flat MSE
+        if self._legacy_loss:
+            self._loss_weighting = "none"
+            self._loss_fn = "mse"
+            self._channel_balance = False
+            self._latent_noise_scale = 0.0
+
+        # Per-channel weights and std (set by trainer from channel_stats.json)
+        self._channel_weights: Optional[torch.Tensor] = None  # [64]
+        self._channel_std: Optional[torch.Tensor] = None       # [64]
 
         # Adaptive timestep sampler (set by trainer when enabled, None = off)
         self._adaptive_sampler = None
@@ -207,9 +225,10 @@ class FixedLoRAModule(nn.Module):
         )
         logger.info(
             "[OK] %s detected -- using %s sampling + CFG dropout "
-            "(ratio=%.2f), loss_weighting=%s",
+            "(ratio=%.2f), loss_weighting=%s, loss_fn=%s%s",
             _variant_label, _mode_label,
-            self._cfg_ratio, self._loss_weighting,
+            self._cfg_ratio, self._loss_weighting, self._loss_fn,
+            " [LEGACY]" if self._legacy_loss else "",
         )
 
         # Rolling buffer of sampled timesteps (CPU tensors) for TensorBoard
@@ -414,9 +433,16 @@ class FixedLoRAModule(nn.Module):
             # Record sampled timesteps for TensorBoard histogram logging.
             self._timestep_buffer.append(t.detach().cpu())
 
-            # ---- Flow matching noise ----------------------------------------
-            x1 = torch.randn_like(target_latents)  # noise
+            # ---- Per-channel latent noise regularization ----------------------
             x0 = target_latents  # data
+            if self._latent_noise_scale > 0 and self._channel_std is not None:
+                ch_std = self._channel_std.to(
+                    device=x0.device, dtype=x0.dtype,
+                )
+                x0 = x0 + torch.randn_like(x0) * (self._latent_noise_scale * ch_std)
+
+            # ---- Flow matching noise ----------------------------------------
+            x1 = torch.randn_like(x0)  # noise
             t_ = t.unsqueeze(-1).unsqueeze(-1)
 
             # ---- Interpolate x_t -------------------------------------------
@@ -437,33 +463,59 @@ class FixedLoRAModule(nn.Module):
 
             # ---- Flow matching loss ----------------------------------------
             flow = x1 - x0
+            pred = decoder_outputs[0]
 
-            if self._loss_weighting == "min_snr":
-                per_sample_loss = F.mse_loss(
-                    decoder_outputs[0], flow, reduction="none",
+            # Per-element loss: Huber (default) or MSE
+            if self._loss_fn == "huber":
+                per_element = F.smooth_l1_loss(
+                    pred, flow, beta=self._huber_delta, reduction="none",
                 )
-                per_sample_loss = per_sample_loss.mean(dim=(-1, -2))
-                # Upcast to fp32 to avoid overflow on fp16 devices (MPS):
-                # ((1-t)/t)^2 can reach ~1e8 which exceeds fp16 max (65504).
+            else:
+                per_element = F.mse_loss(pred, flow, reduction="none")
+
+            # Per-channel fidelity balancing
+            if self._channel_balance and self._channel_weights is not None:
+                cw = self._channel_weights.to(
+                    device=per_element.device, dtype=per_element.dtype,
+                )
+                per_element = per_element * cw  # [B, T, 64] * [64]
+
+            # Attention-mask-weighted loss (skip zero-padded positions)
+            if not self._legacy_loss:
+                mask = attention_mask.unsqueeze(-1)  # [B, T, 1]
+                masked_sum = (per_element * mask).sum()
+                n_valid = mask.sum() * per_element.shape[-1]
+                per_sample_loss_raw = (per_element * mask).sum(dim=(-1, -2)) / (
+                    mask.sum(dim=(-1, -2)) * per_element.shape[-1]
+                ).clamp(min=1e-8)
+            else:
+                masked_sum = per_element.sum()
+                n_valid = torch.tensor(
+                    per_element.numel(), device=per_element.device,
+                    dtype=per_element.dtype,
+                )
+                per_sample_loss_raw = per_element.mean(dim=(-1, -2))
+
+            # Timestep weighting
+            if self._loss_weighting == "flow_snr":
+                t_f32 = t.float().clamp(min=1e-4, max=1.0 - 1e-4)
+                w = ((1.0 - t_f32) ** self._t_bias) / (t_f32 * (1.0 - t_f32))
+                w = w.clamp(max=self._snr_gamma)
+                w = w / w.mean().clamp(min=1e-8)  # normalize to preserve scale
+                diffusion_loss = (w.to(per_sample_loss_raw.dtype) * per_sample_loss_raw).mean()
+            elif self._loss_weighting == "min_snr":
                 t_f32 = t.float().clamp(min=1e-4, max=1.0 - 1e-4)
                 snr = ((1.0 - t_f32) / t_f32) ** 2
                 snr = snr.clamp(max=1e6)
                 weights = torch.clamp(snr, max=self._snr_gamma) / snr.clamp(min=1e-6)
-                diffusion_loss = (weights.to(per_sample_loss.dtype) * per_sample_loss).mean()
+                diffusion_loss = (weights.to(per_sample_loss_raw.dtype) * per_sample_loss_raw).mean()
             else:
-                diffusion_loss = F.mse_loss(decoder_outputs[0], flow)
+                diffusion_loss = masked_sum / n_valid.clamp(min=1e-8)
 
             # Update adaptive sampler with per-sample losses (if enabled)
             if self._adaptive_sampler is not None:
                 with torch.no_grad():
-                    if self._loss_weighting == "min_snr":
-                        # Reuse already-computed per_sample_loss (raw MSE)
-                        self._adaptive_sampler.update(t, per_sample_loss.detach())
-                    else:
-                        _per_sample = F.mse_loss(
-                            decoder_outputs[0], flow, reduction="none",
-                        ).mean(dim=(-1, -2))
-                        self._adaptive_sampler.update(t, _per_sample)
+                    self._adaptive_sampler.update(t, per_sample_loss_raw.detach())
 
         # fp32 for stable backward
         diffusion_loss = diffusion_loss.float()

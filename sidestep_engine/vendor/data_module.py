@@ -244,6 +244,81 @@ class PreprocessedTensorDataset(Dataset):
         logger.info(f"PreprocessedTensorDataset: {len(self.valid_paths)} samples{repeat_info} from {tensor_dir}{chunk_info}{genre_info}")
 
     @staticmethod
+    def load_channel_stats(tensor_dir: str) -> Optional[Dict[str, Any]]:
+        """Load channel_stats.json, computing it on-the-fly if missing.
+
+        Returns dict with keys ``channel_mean``, ``channel_std``,
+        and optionally ``vae_channel_norms``, or ``None`` if no data.
+        """
+        stats_path = Path(tensor_dir) / "channel_stats.json"
+        if stats_path.is_file():
+            try:
+                data = json.loads(stats_path.read_text(encoding="utf-8"))
+                logger.info(
+                    "channel_stats.json loaded (%d samples, std range %.4f-%.4f)",
+                    data.get("n_samples", 0),
+                    min(data["channel_std"]), max(data["channel_std"]),
+                )
+                return data
+            except Exception as exc:
+                logger.warning("Failed to read channel_stats.json: %s", exc)
+
+        # Fallback: compute from .pt files
+        pt_files = [
+            Path(tensor_dir) / f for f in os.listdir(tensor_dir)
+            if f.endswith(".pt") and f != "manifest.json"
+        ]
+        if not pt_files:
+            return None
+
+        logger.info("Computing channel_stats from %d .pt files ...", len(pt_files))
+        running_sum = None
+        running_sq_sum = None
+        n_frames = 0
+
+        for pt_file in pt_files:
+            try:
+                data = torch.load(str(pt_file), weights_only=False, map_location="cpu")
+                latents = data.get("target_latents")
+                if latents is None:
+                    continue
+                latents = latents.float()
+                if running_sum is None:
+                    running_sum = torch.zeros(latents.shape[-1], dtype=torch.float64)
+                    running_sq_sum = torch.zeros(latents.shape[-1], dtype=torch.float64)
+                running_sum += latents.sum(dim=0).double()
+                running_sq_sum += (latents ** 2).sum(dim=0).double()
+                n_frames += latents.shape[0]
+            except Exception:
+                pass
+
+        if n_frames == 0 or running_sum is None:
+            return None
+
+        channel_mean = (running_sum / n_frames).float()
+        channel_var = (running_sq_sum / n_frames - channel_mean.double() ** 2).clamp(min=1e-10).float()
+        channel_std = channel_var.sqrt()
+
+        result = {
+            "channel_mean": channel_mean.tolist(),
+            "channel_std": channel_std.tolist(),
+            "n_samples": len(pt_files),
+            "n_frames": n_frames,
+        }
+
+        # Write for next time
+        try:
+            stats_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+            logger.info(
+                "channel_stats.json computed and saved (%d frames, std range %.4f-%.4f)",
+                n_frames, float(channel_std.min()), float(channel_std.max()),
+            )
+        except Exception:
+            pass
+
+        return result
+
+    @staticmethod
     def _read_genre_ratio(tensor_dir: str) -> int:
         """Read genre_ratio from preprocess_meta.json (0 if absent)."""
         meta_path = Path(tensor_dir) / "preprocess_meta.json"

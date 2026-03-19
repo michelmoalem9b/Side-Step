@@ -1,0 +1,162 @@
+
+======================================================================
+1. KEY STRUCTURE (metadata only, zero RAM)
+======================================================================
+Total keys: 677
+Dtype distribution: {'BF16': 677}
+Components: {'decoder': 476, 'encoder': 140, 'tokenizer': 32, 'detokenizer': 28}, other=1
+Other keys: ['null_condition_emb']
+
+======================================================================
+2. null_condition_emb
+======================================================================
+  shape=[1, 1, 2048], mean=-0.000228, std=0.027789, norm=1.2573
+
+======================================================================
+3. DECODER proj_in
+======================================================================
+  decoder.proj_in.1.bias: shape=[2048], mean=0.000090, std=0.104245
+  decoder.proj_in.1.weight: shape=[2048, 192, 2], mean=-0.000126, std=0.074159
+    src_latents(0:64): norm=32.5367, std=0.063547
+    chunk_masks(64:128): norm=9.7597, std=0.019057
+    noised_xt(128:192): norm=56.3131, std=0.109986
+    src  per-ch: min=2.2748 max=7.5355 mean=3.9963 ratio=3.31x
+    mask per-ch: min=1.1985 max=1.2439 mean=1.2199 ratio=1.04x
+    xt   per-ch: min=6.0087 max=8.2169 mean=7.0251 ratio=1.37x
+
+======================================================================
+4. DECODER proj_out
+======================================================================
+  decoder.proj_out.1.bias: shape=[64], mean=-0.002928, std=0.039656
+  decoder.proj_out.1.weight: shape=[2048, 64, 2], mean=0.000021, std=0.039165
+    Per output-ch norms(64): min=2.2639 max=2.6610 ratio=1.18x
+    lowest:  chs=[29, 56, 23, 14, 13] norms=[2.2639, 2.268, 2.2728, 2.307, 2.3127]
+    highest: chs=[1, 58, 4, 11, 22] norms=[2.6335, 2.6343, 2.6372, 2.6423, 2.661]
+    all 64: [2.5202, 2.6335, 2.4217, 2.5034, 2.6372, 2.3382, 2.5208, 2.62, 2.6074, 2.5209, 2.6053, 2.6423, 2.4008, 2.3127, 2.307, 2.5557, 2.5087, 2.5595, 2.6214, 2.3404, 2.5631, 2.5286, 2.661, 2.2728, 2.5413, 2.321, 2.3777, 2.4277, 2.5928, 2.2639, 2.5668, 2.4405, 2.5195, 2.4763, 2.6098, 2.5177, 2.5278, 2.6056, 2.3259, 2.5767, 2.5896, 2.3776, 2.4154, 2.5581, 2.5626, 2.4494, 2.5684, 2.562, 2.5956, 2.4857, 2.5474, 2.3903, 2.6242, 2.5044, 2.5372, 2.3913, 2.268, 2.5769, 2.6343, 2.5965, 2.5938, 2.5025, 2.5105, 2.5389]
+
+======================================================================
+5. AdaLN scale_shift_tables
+======================================================================
+  decoder.layers.0.scale_shift_table: shape=[1, 6, 2048], mean=-0.084234, std=0.366455, absmax=0.921875
+  decoder.layers.1.scale_shift_table: shape=[1, 6, 2048], mean=0.073583, std=0.250626, absmax=1.085938
+  decoder.layers.10.scale_shift_table: shape=[1, 6, 2048], mean=0.016274, std=0.133563, absmax=0.886719
+  decoder.layers.11.scale_shift_table: shape=[1, 6, 2048], mean=0.030896, std=0.184513, absmax=1.000000
+  decoder.layers.12.scale_shift_table: shape=[1, 6, 2048], mean=0.011420, std=0.145139, absmax=1.015625
+  decoder.layers.13.scale_shift_table: shape=[1, 6, 2048], mean=0.039080, std=0.230251, absmax=1.164062
+  decoder.layers.14.scale_shift_table: shape=[1, 6, 2048], mean=0.018860, std=0.173928, absmax=0.960938
+  decoder.layers.15.scale_shift_table: shape=[1, 6, 2048], mean=0.032154, std=0.230110, absmax=1.039062
+  decoder.layers.16.scale_shift_table: shape=[1, 6, 2048], mean=0.010387, std=0.185913, absmax=1.085938
+  decoder.layers.17.scale_shift_table: shape=[1, 6, 2048], mean=0.029831, std=0.239016, absmax=1.242188
+  decoder.layers.18.scale_shift_table: shape=[1, 6, 2048], mean=0.015043, std=0.225548, absmax=1.078125
+  decoder.layers.19.scale_shift_table: shape=[1, 6, 2048], mean=0.040577, std=0.318401, absmax=1.210938
+  decoder.layers.2.scale_shift_table: shape=[1, 6, 2048], mean=0.044868, std=0.195110, absmax=1.476562
+  decoder.layers.20.scale_shift_table: shape=[1, 6, 2048], mean=0.023736, std=0.282846, absmax=0.996094
+  decoder.layers.21.scale_shift_table: shape=[1, 6, 2048], mean=0.042710, std=0.448226, absmax=1.281250
+  decoder.layers.22.scale_shift_table: shape=[1, 6, 2048], mean=0.018265, std=0.459742, absmax=1.523438
+  decoder.layers.23.scale_shift_table: shape=[1, 6, 2048], mean=-0.012760, std=0.289210, absmax=1.492188
+  decoder.layers.3.scale_shift_table: shape=[1, 6, 2048], mean=0.051979, std=0.151033, absmax=1.171875
+  decoder.layers.4.scale_shift_table: shape=[1, 6, 2048], mean=0.025129, std=0.131545, absmax=1.382812
+  decoder.layers.5.scale_shift_table: shape=[1, 6, 2048], mean=0.039639, std=0.133658, absmax=1.031250
+  decoder.layers.6.scale_shift_table: shape=[1, 6, 2048], mean=0.018641, std=0.122953, absmax=1.203125
+  decoder.layers.7.scale_shift_table: shape=[1, 6, 2048], mean=0.036409, std=0.148371, absmax=0.972656
+  decoder.layers.8.scale_shift_table: shape=[1, 6, 2048], mean=0.020247, std=0.125727, absmax=0.800781
+  decoder.layers.9.scale_shift_table: shape=[1, 6, 2048], mean=0.025742, std=0.150584, absmax=0.878906
+  decoder.scale_shift_table: shape=[1, 2, 2048], mean=-0.046657, std=0.104614, absmax=0.347656
+
+======================================================================
+6. TimestepEmbedding weights
+======================================================================
+  decoder.time_embed.linear_1.bias: shape=[2048], mean=-0.000628, std=0.001674
+  decoder.time_embed.linear_1.weight: shape=[2048, 256], mean=-0.000003, std=0.008790
+  decoder.time_embed.linear_2.bias: shape=[2048], mean=-0.000088, std=0.005986
+  decoder.time_embed.linear_2.weight: shape=[2048, 2048], mean=-0.000003, std=0.002379
+  decoder.time_embed.time_proj.bias: shape=[12288], mean=0.064456, std=0.123574
+  decoder.time_embed.time_proj.weight: shape=[12288, 2048], mean=-0.001202, std=0.027857
+  decoder.time_embed_r.linear_1.bias: shape=[2048], mean=-0.000057, std=0.001158
+  decoder.time_embed_r.linear_1.weight: shape=[2048, 256], mean=-0.000044, std=0.010545
+  decoder.time_embed_r.linear_2.bias: shape=[2048], mean=0.002661, std=0.019833
+  decoder.time_embed_r.linear_2.weight: shape=[2048, 2048], mean=-0.000019, std=0.002794
+  decoder.time_embed_r.time_proj.bias: shape=[12288], mean=0.064456, std=0.123576
+  decoder.time_embed_r.time_proj.weight: shape=[12288, 2048], mean=-0.000850, std=0.052325
+
+======================================================================
+7. DECODER per-layer param counts (metadata, zero RAM)
+======================================================================
+  Layer  0:  19 keys, 62.9M params
+  Layer  1:  19 keys, 62.9M params
+  Layer  2:  19 keys, 62.9M params
+  Layer  3:  19 keys, 62.9M params
+  Layer  4:  19 keys, 62.9M params
+  Layer  5:  19 keys, 62.9M params
+  Layer  6:  19 keys, 62.9M params
+  Layer  7:  19 keys, 62.9M params
+  Layer  8:  19 keys, 62.9M params
+  Layer  9:  19 keys, 62.9M params
+  Layer 10:  19 keys, 62.9M params
+  Layer 11:  19 keys, 62.9M params
+  Layer 12:  19 keys, 62.9M params
+  Layer 13:  19 keys, 62.9M params
+  Layer 14:  19 keys, 62.9M params
+  Layer 15:  19 keys, 62.9M params
+  Layer 16:  19 keys, 62.9M params
+  Layer 17:  19 keys, 62.9M params
+  Layer 18:  19 keys, 62.9M params
+  Layer 19:  19 keys, 62.9M params
+  Layer 20:  19 keys, 62.9M params
+  Layer 21:  19 keys, 62.9M params
+  Layer 22:  19 keys, 62.9M params
+  Layer 23:  19 keys, 62.9M params
+
+======================================================================
+8. Sample layer weight norms (layers 0, 11, 23)
+======================================================================
+  Layer  0: norm=356.54
+  Layer 11: norm=410.71
+  Layer 23: norm=374.04
+
+======================================================================
+9. ENCODER text_projector
+======================================================================
+  encoder.text_projector.weight: shape=[2048, 1024], mean=-0.000030, std=0.038920, norm=56.3647
+
+======================================================================
+10. BASE vs SFT vs TURBO
+======================================================================
+
+  sft vs base: shared=677, only_base=0, only_sft=0
+
+  turbo vs base: shared=677, only_base=0, only_turbo=0
+
+======================================================================
+10b. BASE vs SFT sample weight diffs (serialized)
+======================================================================
+  null_condition_emb: diff=0.032458, norm=1.2573, rel=0.025815
+  decoder.layers.0.self_attn.q_proj.weight: diff=8.479046, norm=76.9000, rel=0.110261
+  decoder.layers.0.cross_attn.q_proj.weight: diff=6.758492, norm=94.6633, rel=0.071395
+  decoder.layers.11.self_attn.q_proj.weight: diff=15.321635, norm=104.0356, rel=0.147273
+  decoder.layers.11.cross_attn.q_proj.weight: diff=13.008609, norm=106.8990, rel=0.121691
+  decoder.layers.23.self_attn.q_proj.weight: diff=18.919241, norm=101.1650, rel=0.187014
+  decoder.layers.23.cross_attn.q_proj.weight: diff=20.060686, norm=86.8759, rel=0.230912
+
+======================================================================
+11. VAE WEIGHTS
+======================================================================
+  Total keys: 365
+  Dtype: {'BF16': 365}
+  Latent-facing: decoder.conv1.weight_v: shape=[2048, 64, 7], dtype=BF16
+
+  decoder.conv1.weight_v: shape=[2048, 64, 7]
+    per-input-ch norms(64): min=4.9884 max=12.5902 ratio=2.52x
+
+======================================================================
+12. SILENCE LATENT per-channel stats
+======================================================================
+  Shape: [1, 64, 15000], dtype=torch.float32
+  Per-ch mean: min=-5.0851 max=1.5996 range=6.6847
+  Per-ch std:  min=0.0012 max=0.0209 ratio=18.04x
+  Lowest-var:  chs=[40, 46, 52, 9, 31] stds=[0.0012, 0.0016, 0.0017, 0.0018, 0.002]
+  Highest-var: chs=[26, 45, 25, 19, 14] stds=[0.0105, 0.0106, 0.0119, 0.0141, 0.0209]
+  All 64 means: [-0.136, -0.158, 0.587, -0.574, 0.03, 0.279, -0.002, -0.207, -0.161, -0.148, -0.028, -0.182, -0.296, 1.6, -2.674, 0.778, -1.35, -0.194, -0.071, -5.085, 0.243, 0.473, 0.045, -0.665, -0.22, -0.674, -0.157, 0.955, -0.2, -1.708, 0.589, -0.572, 0.514, 0.285, 0.145, -0.188, -0.06, 0.367, -0.101, -0.157, 0.206, -0.434, -0.829, 0.045, -0.66, 0.148, 0.095, 0.385, -1.254, -0.333, -0.856, 0.433, 0.424, -0.894, -0.502, -0.056, -2.92, -0.025, 0.504, 0.985, 0.073, -0.216, 0.637, 1.0]
+  All 64 stds:  [0.0092, 0.0028, 0.0039, 0.006, 0.0056, 0.0044, 0.0027, 0.0037, 0.0077, 0.0018, 0.003, 0.006, 0.0032, 0.0029, 0.0209, 0.0028, 0.006, 0.0066, 0.0089, 0.0141, 0.0059, 0.008, 0.0101, 0.0045, 0.0031, 0.0119, 0.0105, 0.0034, 0.0032, 0.0036, 0.0103, 0.002, 0.0065, 0.0054, 0.0039, 0.007, 0.0073, 0.0047, 0.0024, 0.0027, 0.0012, 0.007, 0.0041, 0.0082, 0.004, 0.0106, 0.0016, 0.0087, 0.0055, 0.0083, 0.005, 0.0074, 0.0017, 0.0074, 0.0043, 0.0058, 0.0043, 0.0053, 0.0027, 0.0046, 0.0031, 0.0026, 0.0053, 0.0061]
+
+=== DONE ===

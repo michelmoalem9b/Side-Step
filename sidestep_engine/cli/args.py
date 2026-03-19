@@ -57,6 +57,13 @@ from sidestep_engine.training_defaults import (
     DEFAULT_SCHEDULER_TYPE,
     DEFAULT_SEED,
     DEFAULT_SNR_GAMMA,
+    DEFAULT_LOSS_FN,
+    DEFAULT_HUBER_DELTA,
+    DEFAULT_CHANNEL_BALANCE,
+    DEFAULT_VAE_CHANNEL_PRIOR,
+    DEFAULT_LATENT_NOISE,
+    DEFAULT_T_BIAS,
+    DEFAULT_LEGACY_LOSS,
     DEFAULT_WARMUP_START_FACTOR,
     DEFAULT_WARMUP_STEPS,
     DEFAULT_WEIGHT_DECAY,
@@ -553,10 +560,31 @@ def _add_train_args(parser: argparse.ArgumentParser) -> None:
                    dest="timestep_mode",
                    help=f"Timestep sampling: 'continuous' (logit-normal, recommended) or 'discrete' (8-step turbo schedule). (default: {DEFAULT_TIMESTEP_MODE})")
     g.add_argument("--cfg-ratio", type=float, default=DEFAULT_CFG_RATIO, help=f"CFG dropout probability (default: {DEFAULT_CFG_RATIO})")
-    g.add_argument("--loss-weighting", type=str, default=DEFAULT_LOSS_WEIGHTING, choices=["none", "min_snr"],
-                   help=f"Loss weighting: 'none' (flat MSE) or 'min_snr' (can yield better results on SFT/base, default: {DEFAULT_LOSS_WEIGHTING})")
+    g.add_argument("--loss-weighting", type=str, default=DEFAULT_LOSS_WEIGHTING, choices=["none", "min_snr", "flow_snr"],
+                   help=f"Loss weighting: 'flow_snr' (correct for rectified flow), 'min_snr' (DDPM, legacy), or 'none' (flat). (default: {DEFAULT_LOSS_WEIGHTING})")
     g.add_argument("--snr-gamma", type=float, default=DEFAULT_SNR_GAMMA,
-                   help=f"Gamma for min-SNR weighting (default: {DEFAULT_SNR_GAMMA})")
+                   help=f"Gamma clamp for flow_snr/min_snr weighting (default: {DEFAULT_SNR_GAMMA})")
+    g.add_argument("--loss-fn", type=str, default=DEFAULT_LOSS_FN, choices=["mse", "huber"],
+                   dest="loss_fn",
+                   help=f"Loss function: 'huber' (outlier-robust) or 'mse'. (default: {DEFAULT_LOSS_FN})")
+    g.add_argument("--huber-delta", type=float, default=DEFAULT_HUBER_DELTA,
+                   dest="huber_delta",
+                   help=f"Huber loss delta threshold (default: {DEFAULT_HUBER_DELTA})")
+    g.add_argument("--channel-balance", action=argparse.BooleanOptionalAction, default=DEFAULT_CHANNEL_BALANCE,
+                   dest="channel_balance",
+                   help=f"Per-channel fidelity balancing (default: {DEFAULT_CHANNEL_BALANCE})")
+    g.add_argument("--vae-channel-prior", action=argparse.BooleanOptionalAction, default=DEFAULT_VAE_CHANNEL_PRIOR,
+                   dest="vae_channel_prior",
+                   help=f"Use VAE decoder channel importance in channel weights (default: {DEFAULT_VAE_CHANNEL_PRIOR})")
+    g.add_argument("--latent-noise", type=float, default=DEFAULT_LATENT_NOISE,
+                   dest="latent_noise",
+                   help=f"Per-channel latent noise regularization scale, 0=off (default: {DEFAULT_LATENT_NOISE})")
+    g.add_argument("--t-bias", type=float, default=DEFAULT_T_BIAS,
+                   dest="t_bias",
+                   help=f"Asymmetric timestep emphasis toward low-t detail, 0=symmetric (default: {DEFAULT_T_BIAS})")
+    g.add_argument("--legacy-loss", action="store_true", default=DEFAULT_LEGACY_LOSS,
+                   dest="legacy_loss",
+                   help="Revert all loss math to pre-flow-SNR behavior (flat MSE, no channel balancing)")
     g.add_argument("--ignore-fisher-map", action="store_true", default=False,
                    help="Bypass auto-detection of fisher_map.json in --dataset-dir")
     g.add_argument("--dataset-repeats", "-R", type=int, default=DEFAULT_DATASET_REPEATS,

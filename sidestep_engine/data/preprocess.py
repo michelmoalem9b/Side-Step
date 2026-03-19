@@ -103,6 +103,103 @@ def _write_preprocess_meta(
 
 
 # ---------------------------------------------------------------------------
+# Channel statistics for flow matching fidelity balancing
+# ---------------------------------------------------------------------------
+
+def _compute_channel_stats(
+    out_path: Path,
+    checkpoint_dir: str,
+    variant: str,
+) -> None:
+    """Compute per-channel mean/std from all final .pt files and write channel_stats.json.
+
+    Also extracts per-channel L2 norms from the VAE decoder's first conv
+    layer (``decoder.conv1.weight_v``) for importance weighting.
+    """
+    stats_path = out_path / "channel_stats.json"
+
+    # Collect target_latents from all .pt files
+    pt_files = [f for f in out_path.glob("*.pt") if f.name != "manifest.json"]
+    if not pt_files:
+        logger.info("[Side-Step] No .pt files found -- skipping channel_stats")
+        return
+
+    running_sum = None
+    running_sq_sum = None
+    n_frames = 0
+
+    for pt_file in pt_files:
+        try:
+            data = torch.load(str(pt_file), weights_only=False, map_location="cpu")
+            latents = data.get("target_latents")
+            if latents is None:
+                continue
+            latents = latents.float()  # [T, C]
+            if running_sum is None:
+                running_sum = torch.zeros(latents.shape[-1], dtype=torch.float64)
+                running_sq_sum = torch.zeros(latents.shape[-1], dtype=torch.float64)
+            running_sum += latents.sum(dim=0).double()
+            running_sq_sum += (latents ** 2).sum(dim=0).double()
+            n_frames += latents.shape[0]
+        except Exception as exc:
+            logger.debug("channel_stats: skip %s: %s", pt_file.name, exc)
+
+    if n_frames == 0 or running_sum is None:
+        logger.warning("[Side-Step] No valid latents for channel_stats")
+        return
+
+    channel_mean = (running_sum / n_frames).float()
+    channel_var = (running_sq_sum / n_frames - channel_mean.double() ** 2).clamp(min=1e-10).float()
+    channel_std = channel_var.sqrt()
+
+    # VAE channel importance from decoder.conv1.weight_v norms
+    vae_norms = None
+    try:
+        from sidestep_engine.core.constants import VARIANT_DIR_MAP
+        mapped = VARIANT_DIR_MAP.get(variant, variant)
+        ckpt_root = Path(checkpoint_dir) / mapped
+        # Try loading just the VAE state dict keys we need
+        import glob
+        safetensor_files = list(ckpt_root.glob("*.safetensors"))
+        if safetensor_files:
+            try:
+                from safetensors.torch import load_file
+                for sf in safetensor_files:
+                    st = load_file(str(sf))
+                    for key in st:
+                        if "decoder.conv1.weight_v" in key or "vae" in key.lower() and "conv1.weight_v" in key:
+                            w = st[key].float()  # [out_ch, in_ch, kernel]
+                            vae_norms = w.norm(dim=(1, 2)).tolist()[:channel_mean.shape[0]]
+                            break
+                    if vae_norms is not None:
+                        break
+            except ImportError:
+                pass
+    except Exception as exc:
+        logger.debug("channel_stats: could not read VAE norms: %s", exc)
+
+    payload = {
+        "channel_mean": channel_mean.tolist(),
+        "channel_std": channel_std.tolist(),
+        "n_samples": len(pt_files),
+        "n_frames": n_frames,
+    }
+    if vae_norms is not None:
+        payload["vae_channel_norms"] = vae_norms
+
+    try:
+        stats_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        logger.info(
+            "[Side-Step] channel_stats.json written (%d samples, %d frames, "
+            "std range %.4f-%.4f)",
+            len(pt_files), n_frames,
+            float(channel_std.min()), float(channel_std.max()),
+        )
+    except Exception as exc:
+        logger.warning("[Side-Step] Could not write channel_stats.json: %s", exc)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -248,6 +345,10 @@ def preprocess_audio_files(
     )
 
     failed = pass1_failed + pass2_failed
+
+    # Compute per-channel statistics for flow matching fidelity balancing
+    _compute_channel_stats(out_path, checkpoint_dir, variant)
+
     _write_preprocess_meta(
         out_path,
         audio_dir=audio_dir,

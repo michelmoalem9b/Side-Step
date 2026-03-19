@@ -178,6 +178,30 @@ class FixedLoRATrainer:
                 dtype=dtype,
             )
 
+            # -- Channel stats for fidelity balancing ----------------------
+            if not cfg.legacy_loss:
+                from sidestep_engine.vendor.data_module import PreprocessedTensorDataset
+                ch_stats = PreprocessedTensorDataset.load_channel_stats(cfg.dataset_dir)
+                if ch_stats is not None:
+                    ch_std = torch.tensor(ch_stats["channel_std"], dtype=torch.float32)
+                    # Build channel weights: inverse-std, optionally scaled by VAE importance
+                    inv_std = 1.0 / ch_std.clamp(min=1e-6)
+                    if cfg.vae_channel_prior and "vae_channel_norms" in ch_stats:
+                        vae_imp = torch.tensor(ch_stats["vae_channel_norms"], dtype=torch.float32)
+                        vae_imp = vae_imp / vae_imp.mean().clamp(min=1e-6)
+                        channel_weights = inv_std * vae_imp
+                    else:
+                        channel_weights = inv_std
+                    channel_weights = channel_weights / channel_weights.mean()  # normalize to mean=1
+                    self.module._channel_weights = channel_weights
+                    self.module._channel_std = ch_std
+                    logger.info(
+                        "[Side-Step] Channel balancing active: weight range %.3f-%.3f (mean=1)",
+                        float(channel_weights.min()), float(channel_weights.max()),
+                    )
+                else:
+                    logger.info("[Side-Step] No channel_stats found -- channel balancing disabled")
+
             # -- Data -------------------------------------------------------
             num_workers = cfg.num_workers
             if sys.platform == "win32" and num_workers > 0:

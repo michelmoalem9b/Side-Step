@@ -122,8 +122,15 @@ DEFAULT_LOG_HEAVY_EVERY: int = 50
 # ---------------------------------------------------------------------------
 
 DEFAULT_CFG_RATIO: float = 0.15
-DEFAULT_LOSS_WEIGHTING: str = "none"
+DEFAULT_LOSS_WEIGHTING: str = "flow_snr"
 DEFAULT_SNR_GAMMA: float = 5.0
+DEFAULT_LOSS_FN: str = "huber"
+DEFAULT_HUBER_DELTA: float = 1.0
+DEFAULT_CHANNEL_BALANCE: bool = True
+DEFAULT_VAE_CHANNEL_PRIOR: bool = True
+DEFAULT_LATENT_NOISE: float = 0.02
+DEFAULT_T_BIAS: float = 0.5
+DEFAULT_LEGACY_LOSS: bool = False
 DEFAULT_TIMESTEP_MODE: str = "continuous"
 
 # ---------------------------------------------------------------------------
@@ -235,6 +242,13 @@ TRAINING_DEFAULTS: dict = {
     "cfg_ratio": DEFAULT_CFG_RATIO,
     "loss_weighting": DEFAULT_LOSS_WEIGHTING,
     "snr_gamma": DEFAULT_SNR_GAMMA,
+    "loss_fn": DEFAULT_LOSS_FN,
+    "huber_delta": DEFAULT_HUBER_DELTA,
+    "channel_balance": DEFAULT_CHANNEL_BALANCE,
+    "vae_channel_prior": DEFAULT_VAE_CHANNEL_PRIOR,
+    "latent_noise": DEFAULT_LATENT_NOISE,
+    "t_bias": DEFAULT_T_BIAS,
+    "legacy_loss": DEFAULT_LEGACY_LOSS,
     "timestep_mode": DEFAULT_TIMESTEP_MODE,
     # Chunking
     "max_latent_length": DEFAULT_MAX_LATENT_LENGTH,
@@ -308,6 +322,13 @@ GUI_FIELD_MAP: dict = {
     "cfg_ratio": "full-cfg-dropout",
     "loss_weighting": "full-loss-weighting",
     "snr_gamma": "full-snr-gamma",
+    "loss_fn": "full-loss-fn",
+    "huber_delta": "full-huber-delta",
+    "channel_balance": "full-channel-balance",
+    "vae_channel_prior": "full-vae-channel-prior",
+    "latent_noise": "full-latent-noise",
+    "t_bias": "full-t-bias",
+    "legacy_loss": "full-legacy-loss",
     "offload_encoder": "full-offload-encoder",
     "gradient_checkpointing_ratio": "full-grad-ckpt-ratio",
     "chunk_decay_every": "full-chunk-decay-every",

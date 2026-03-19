@@ -289,14 +289,42 @@ const WorkspaceBehaviors = (() => {
     update();
   }
 
-  /* ---- Loss weighting ---- */
+  /* ---- Loss weighting & fidelity controls ---- */
   function initLossWeightingReactivity() {
-    const sel = $("full-loss-weighting");
+    const lossFnSel = $("full-loss-fn");
+    const lossWtSel = $("full-loss-weighting");
     const snrGroup = $("snr-gamma-group");
-    if (!sel || !snrGroup) return;
-    sel.addEventListener("change", () => {
-      snrGroup.style.display = sel.value === "min_snr" ? "" : "none";
-    });
+    const huberGroup = $("huber-delta-group");
+    const tBiasGroup = $("t-bias-group");
+    const chBalGroup = $("channel-balance-group");
+    const vaePriorGroup = $("vae-channel-prior-group");
+    const latNoiseGroup = $("latent-noise-group");
+    const legacyCb = $("full-legacy-loss");
+
+    function updateFidelityVisibility() {
+      const isLegacy = legacyCb && legacyCb.checked;
+      const lossWt = lossWtSel ? lossWtSel.value : "flow_snr";
+      const lossFn = lossFnSel ? lossFnSel.value : "huber";
+
+      // SNR gamma visible when flow_snr or min_snr
+      if (snrGroup) snrGroup.style.display = (!isLegacy && (lossWt === "flow_snr" || lossWt === "min_snr")) ? "" : "none";
+      // Huber delta visible when loss_fn=huber
+      if (huberGroup) huberGroup.style.display = (!isLegacy && lossFn === "huber") ? "" : "none";
+      // t_bias visible when flow_snr
+      if (tBiasGroup) tBiasGroup.style.display = (!isLegacy && lossWt === "flow_snr") ? "" : "none";
+      // Channel/VAE/noise hidden when legacy
+      if (chBalGroup) chBalGroup.style.display = isLegacy ? "none" : "";
+      if (vaePriorGroup) vaePriorGroup.style.display = isLegacy ? "none" : "";
+      if (latNoiseGroup) latNoiseGroup.style.display = isLegacy ? "none" : "";
+      // Loss fn/weighting selectors hidden when legacy
+      if (lossFnSel) lossFnSel.closest(".form-group").style.display = isLegacy ? "none" : "";
+      if (lossWtSel) lossWtSel.closest(".form-group").style.display = isLegacy ? "none" : "";
+    }
+
+    if (lossFnSel) lossFnSel.addEventListener("change", updateFidelityVisibility);
+    if (lossWtSel) lossWtSel.addEventListener("change", updateFidelityVisibility);
+    if (legacyCb) legacyCb.addEventListener("change", updateFidelityVisibility);
+    updateFidelityVisibility();
   }
 
 

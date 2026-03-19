@@ -292,12 +292,34 @@ class TrainingConfigV2(TrainingConfig):
     data_proportion: float = 0.5
     """Data proportion for sample_t_r (from model config)."""
 
-    loss_weighting: str = "none"
-    """Loss weighting strategy: 'none' (flat MSE) or 'min_snr'.
-    min-SNR can yield better results on SFT and base models."""
+    loss_weighting: str = "flow_snr"
+    """Loss weighting strategy: 'flow_snr' (correct for rectified flow),
+    'min_snr' (DDPM formula, legacy), or 'none' (flat)."""
 
     snr_gamma: float = 5.0
-    """Gamma clamp for min-SNR weighting. Only used when loss_weighting='min_snr'."""
+    """Gamma clamp for flow_snr/min_snr weighting."""
+
+    loss_fn: str = "huber"
+    """Loss function: 'huber' (smooth L1, outlier-robust) or 'mse'."""
+
+    huber_delta: float = 1.0
+    """Huber loss delta threshold. Only used when loss_fn='huber'."""
+
+    channel_balance: bool = True
+    """Per-channel fidelity balancing using inverse-std weights."""
+
+    vae_channel_prior: bool = True
+    """Incorporate VAE decoder channel importance into channel weights."""
+
+    latent_noise: float = 0.02
+    """Per-channel latent noise regularisation scale. 0 = disabled."""
+
+    t_bias: float = 0.5
+    """Asymmetric timestep emphasis toward low-t (detail). 0 = symmetric."""
+
+    legacy_loss: bool = False
+    """Revert all loss math to pre-flow-SNR behavior (flat MSE, no channel
+    balancing, no latent noise, no attention masking in loss)."""
 
     # --- Adapter selection ----------------------------------------------------
     adapter_type: str = "lora"
@@ -528,6 +550,16 @@ class TrainingConfigV2(TrainingConfig):
                 f"adaptive_timestep_ratio must be >= 0 and <= 1 "
                 f"(got {self.adaptive_timestep_ratio})"
             )
+        if self.loss_fn not in ("mse", "huber"):
+            errors.append(f"loss_fn must be 'mse' or 'huber' (got {self.loss_fn!r})")
+        if self.huber_delta <= 0:
+            errors.append(f"huber_delta must be > 0 (got {self.huber_delta})")
+        if self.latent_noise < 0:
+            errors.append(f"latent_noise must be >= 0 (got {self.latent_noise})")
+        if not (0.0 <= self.t_bias <= 2.0):
+            errors.append(f"t_bias must be >= 0 and <= 2 (got {self.t_bias})")
+        if self.loss_weighting not in ("none", "min_snr", "flow_snr"):
+            errors.append(f"loss_weighting must be 'none', 'min_snr', or 'flow_snr' (got {self.loss_weighting!r})")
         if not (0.0 < self.warmup_start_factor <= 1.0):
             errors.append(
                 f"warmup_start_factor must be > 0 and <= 1 "
@@ -646,6 +678,13 @@ class TrainingConfigV2(TrainingConfig):
                 "data_proportion": self.data_proportion,
                 "loss_weighting": self.loss_weighting,
                 "snr_gamma": self.snr_gamma,
+                "loss_fn": self.loss_fn,
+                "huber_delta": self.huber_delta,
+                "channel_balance": self.channel_balance,
+                "vae_channel_prior": self.vae_channel_prior,
+                "latent_noise": self.latent_noise,
+                "t_bias": self.t_bias,
+                "legacy_loss": self.legacy_loss,
                 "is_turbo": self.is_turbo,
                 "model_variant": self.model_variant,
                 "checkpoint_dir": self.checkpoint_dir,

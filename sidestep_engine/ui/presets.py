@@ -143,6 +143,7 @@ PRESET_TYPES: dict[str, type] = {
     "dataset_repeats": int, "shift": float, "num_inference_steps": int,
     "chunk_duration": int, "chunk_decay_every": int,
     "cfg_ratio": float, "snr_gamma": float, "timestep_mode": str,
+    "loss_fn": str, "huber_delta": float, "latent_noise": float, "t_bias": float,
     "save_every": int, "log_every": int, "log_heavy_every": int,
     "save_best_after": int, "early_stop_patience": int,
     "gradient_checkpointing_ratio": float,
@@ -153,6 +154,7 @@ PRESET_TYPES: dict[str, type] = {
     "ema_decay": float, "val_split": float, "adaptive_timestep_ratio": float,
     "warmup_start_factor": float, "cosine_eta_min_ratio": float,
     "cosine_restarts_count": int, "save_best_every_n_steps": int,
+    # Booleans (stored as bool in JSON, no coercion needed but listed for completeness)
 }
 
 
@@ -179,6 +181,8 @@ PRESET_FIELDS = frozenset([
     "crop_mode", "chunk_duration", "max_latent_length", "chunk_decay_every",
     "optimizer_type", "scheduler_type", "scheduler_formula",
     "timestep_mode", "cfg_ratio", "loss_weighting", "snr_gamma",
+    "loss_fn", "huber_delta", "channel_balance", "vae_channel_prior",
+    "latent_noise", "t_bias", "legacy_loss",
     "save_every", "log_every", "log_heavy_every",
     "save_best", "save_best_after", "early_stop_patience",
     "target_loss", "target_loss_floor", "target_loss_warmup", "target_loss_smoothing",

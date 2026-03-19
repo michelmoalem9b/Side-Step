@@ -156,6 +156,34 @@ def _levers_experimental(a: dict) -> None:
     else:
         a.setdefault("adaptive_timestep_ratio", 0.0)
 
+    print_message(
+        "\nFlow matching fidelity controls. These are new defaults that improve\n"
+        "  training quality. Set legacy_loss=True to revert everything.",
+        kind="dim",
+    )
+    a["t_bias"] = ask(
+        "Timestep bias toward detail (0 = symmetric, 0.5 = recommended)",
+        default=a.get("t_bias", 0.5), type_fn=float,
+        validate_fn=lambda v: "Must be >= 0 and <= 2" if v < 0 or v > 2 else None,
+    )
+    a["channel_balance"] = ask(
+        "Per-channel fidelity balancing (True/False)",
+        default=a.get("channel_balance", True), type_fn=bool,
+    )
+    a["vae_channel_prior"] = ask(
+        "Use VAE decoder importance in channel weights (True/False)",
+        default=a.get("vae_channel_prior", True), type_fn=bool,
+    )
+    a["latent_noise"] = ask(
+        "Per-channel latent noise scale (0 = off, 0.02 = recommended)",
+        default=a.get("latent_noise", 0.02), type_fn=float,
+        validate_fn=lambda v: "Must be >= 0" if v < 0 else None,
+    )
+    a["legacy_loss"] = ask(
+        "Legacy loss mode (reverts all fidelity changes, True/False)",
+        default=a.get("legacy_loss", False), type_fn=bool,
+    )
+
 
 def _levers_tracking(a: dict) -> None:
     """Training dynamics / tracking knobs."""
