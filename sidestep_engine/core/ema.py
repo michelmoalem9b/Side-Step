@@ -29,11 +29,11 @@ class AdapterEMA:
             Typical: 0.9999 (slow), 0.999 (faster tracking).
     """
 
-    def __init__(self, params: Iterable[torch.nn.Parameter], decay: float, warmup: bool = True) -> None:
+    def __init__(self, params: Iterable[torch.nn.Parameter], decay: float, warmup_steps: int = 2000) -> None:
         if not (0.0 <= decay < 1.0):
             raise ValueError(f"EMA decay must be >= 0 and < 1 (got {decay})")
         self.decay = decay
-        self._warmup = warmup
+        self._warmup_steps = max(0, warmup_steps)
         # Deep-clone to CPU in float32 so we don't consume GPU VRAM
         # and accumulate in full precision regardless of mixed-precision dtype.
         self._params: List[torch.nn.Parameter] = list(params)
@@ -52,13 +52,12 @@ class AdapterEMA:
     def update(self) -> None:
         """Update shadow params: ``shadow = decay * shadow + (1-decay) * param``.
 
-        When warmup is enabled, uses ramping decay:
-        ``effective_decay = min(target_decay, (1 + step) / (10 + step))``
-        so the EMA catches up quickly in early training then locks in
-        stability once enough steps have passed.
+        When ``warmup_steps > 0``, the effective decay ramps linearly from
+        0 to the target decay over that many steps.  This lets the shadow
+        quickly track early weight changes instead of lagging behind.
         """
-        if self._warmup:
-            d = min(self.decay, (1.0 + self._step_count) / (10.0 + self._step_count))
+        if self._warmup_steps > 0 and self._step_count < self._warmup_steps:
+            d = self.decay * (self._step_count / self._warmup_steps)
         else:
             d = self.decay
         for shadow, param in zip(self._shadow, self._params):

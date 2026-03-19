@@ -25,6 +25,7 @@ from sidestep_engine.training_defaults import (
     DEFAULT_DROPOUT,
     DEFAULT_EARLY_STOP_PATIENCE,
     DEFAULT_EMA_DECAY,
+    DEFAULT_EMA_WARMUP_STEPS,
     DEFAULT_TARGET_LOSS,
     DEFAULT_TARGET_LOSS_FLOOR,
     DEFAULT_TARGET_LOSS_WARMUP,
@@ -349,6 +350,7 @@ def build_train_namespace(a: dict, mode: str = "train") -> argparse.Namespace:
         timestep_mode=a.get("timestep_mode", DEFAULT_TIMESTEP_MODE),
         # "All the Levers" enhancements
         ema_decay=a.get("ema_decay", DEFAULT_EMA_DECAY),
+        ema_warmup_steps=a.get("ema_warmup_steps", DEFAULT_EMA_WARMUP_STEPS),
         val_split=a.get("val_split", DEFAULT_VAL_SPLIT),
         adaptive_timestep_ratio=a.get("adaptive_timestep_ratio", DEFAULT_ADAPTIVE_TIMESTEP_RATIO),
         warmup_start_factor=a.get("warmup_start_factor", DEFAULT_WARMUP_START_FACTOR),

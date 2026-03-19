@@ -1348,6 +1348,16 @@
                   <div class="field-error"></div>
                   <div class="hint">Smoothed adapter weights. 0.9999=typical, 0.999=faster.</div>
                 </div>
+                <div class="form-group" id="ema-warmup-group">
+                  <label class="form-group__label">EMA warmup steps <span class="help-icon" data-help="help-full-ema-warmup">?</span></label>
+                  <div id="help-full-ema-warmup" class="help-panel">
+                    <p>Number of optimizer steps over which EMA decay ramps linearly from 0 to the target decay rate.</p>
+                    <p>Prevents the EMA shadow from lagging behind during early training when weights are changing rapidly. At step 0, decay=0 (shadow = current weights). At warmup_steps, decay reaches the target.</p>
+                    <p>0 = no warmup (flat decay from step 0). 2000 = recommended default.</p>
+                  </div>
+                  <input class="input has-default" type="number" id="full-ema-warmup-steps" value="2000" step="100" data-default="2000" data-validate="gte:0 int">
+                  <div class="field-error"></div>
+                </div>
                 <div class="form-group">
                   <label class="form-group__label">Validation split (0=off) <span class="help-icon" data-help="help-full-val">?</span></label>
                   <div id="help-full-val" class="help-panel">

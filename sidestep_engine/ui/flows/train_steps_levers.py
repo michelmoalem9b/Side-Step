@@ -130,6 +130,12 @@ def _levers_experimental(a: dict) -> None:
         default=a.get("ema_decay", 0.0), type_fn=float,
         validate_fn=lambda v: "Must be >= 0 and < 1" if v < 0 or v >= 1 else None,
     )
+    if a["ema_decay"] > 0:
+        a["ema_warmup_steps"] = ask(
+            "EMA warmup steps (ramps decay from 0 to target over N steps, 0 = no warmup)",
+            default=a.get("ema_warmup_steps", 2000), type_fn=int,
+            validate_fn=lambda v: "Must be >= 0" if v < 0 else None,
+        )
 
     print_message(
         "\nValidation holds out data to detect overfitting.\n"
