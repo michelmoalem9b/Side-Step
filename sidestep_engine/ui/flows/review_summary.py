@@ -119,7 +119,7 @@ _GROUPS_TEMPLATE: List[Tuple[str, List[Tuple[str, str]]]] = [
     ("Corrected Training", [
         ("cfg_ratio", "CFG dropout ratio"),
         ("loss_fn", "Loss function"),
-        ("huber_delta", "Huber delta"),
+        ("huber_delta", "Huber/Pseudo-Huber delta"),
         ("loss_weighting", "Loss weighting"),
         ("snr_gamma", "SNR gamma"),
     ]),

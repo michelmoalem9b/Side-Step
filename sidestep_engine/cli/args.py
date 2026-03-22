@@ -567,9 +567,10 @@ def _add_train_args(parser: argparse.ArgumentParser) -> None:
                    help=f"Loss weighting: 'flow_snr' (correct for rectified flow), 'min_snr' (DDPM, legacy), or 'none' (flat). (default: {DEFAULT_LOSS_WEIGHTING})")
     g.add_argument("--snr-gamma", type=float, default=DEFAULT_SNR_GAMMA,
                    help=f"Gamma clamp for flow_snr/min_snr weighting (default: {DEFAULT_SNR_GAMMA})")
-    g.add_argument("--loss-fn", type=str, default=DEFAULT_LOSS_FN, choices=["mse", "huber"],
+    g.add_argument("--loss-fn", type=str, default=DEFAULT_LOSS_FN,
+                   choices=["mse", "huber", "pseudo_huber", "x0_mse", "x0_pseudo_huber"],
                    dest="loss_fn",
-                   help=f"Loss function: 'huber' (outlier-robust) or 'mse'. (default: {DEFAULT_LOSS_FN})")
+                   help=f"Loss function. x0_ prefix computes loss on reconstructed x0 (t² weighting). (default: {DEFAULT_LOSS_FN})")
     g.add_argument("--huber-delta", type=float, default=DEFAULT_HUBER_DELTA,
                    dest="huber_delta",
                    help=f"Huber loss delta threshold (default: {DEFAULT_HUBER_DELTA})")

@@ -161,12 +161,12 @@ def step_cfg(a: dict) -> None:
     section("Corrected Training Settings (press Enter for defaults)")
     a["cfg_ratio"] = ask("CFG dropout ratio", default=a.get("cfg_ratio", 0.15), type_fn=float, allow_back=True)
     a["loss_fn"] = ask(
-        "Loss function (mse = correct for flow matching, huber = smooth L1)",
+        "Loss function (x0_ prefix = paper's t² weighting, pseudo_huber = smooth Huber)",
         default=a.get("loss_fn", "mse"),
-        choices=["mse", "huber"], allow_back=True,
+        choices=["mse", "huber", "pseudo_huber", "x0_mse", "x0_pseudo_huber"], allow_back=True,
     )
-    if a["loss_fn"] == "huber":
-        a["huber_delta"] = ask("Huber delta", default=a.get("huber_delta", 1.0), type_fn=float, allow_back=True)
+    if a["loss_fn"] in ("huber", "pseudo_huber", "x0_pseudo_huber"):
+        a["huber_delta"] = ask("Huber/Pseudo-Huber delta", default=a.get("huber_delta", 1.0), type_fn=float, allow_back=True)
     a["loss_weighting"] = ask(
         "Loss weighting (flow_snr = correct for flow matching, min_snr = DDPM legacy, none = flat)",
         default=a.get("loss_weighting", "flow_snr"),
