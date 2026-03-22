@@ -300,10 +300,11 @@ class TrainingConfigV2(TrainingConfig):
     """Gamma clamp for flow_snr/min_snr weighting."""
 
     loss_fn: str = "mse"
-    """Loss function: 'mse' (correct for flow matching) or 'huber' (smooth L1)."""
+    """Loss function: 'mse', 'huber', 'pseudo_huber', 'x0_mse', or 'x0_pseudo_huber'.
+    x0_ prefix computes loss on reconstructed x₀ (implicit t² weighting)."""
 
     huber_delta: float = 1.0
-    """Huber loss delta threshold. Only used when loss_fn='huber'."""
+    """Delta threshold for huber/pseudo_huber loss variants."""
 
     channel_balance: bool = True
     """Per-channel fidelity balancing using inverse-std weights."""
@@ -562,8 +563,9 @@ class TrainingConfigV2(TrainingConfig):
                 f"adaptive_timestep_ratio must be >= 0 and <= 1 "
                 f"(got {self.adaptive_timestep_ratio})"
             )
-        if self.loss_fn not in ("mse", "huber"):
-            errors.append(f"loss_fn must be 'mse' or 'huber' (got {self.loss_fn!r})")
+        _valid_loss_fns = ("mse", "huber", "pseudo_huber", "x0_mse", "x0_pseudo_huber")
+        if self.loss_fn not in _valid_loss_fns:
+            errors.append(f"loss_fn must be one of {_valid_loss_fns} (got {self.loss_fn!r})")
         if self.huber_delta <= 0:
             errors.append(f"huber_delta must be > 0 (got {self.huber_delta})")
         if self.latent_noise < 0:

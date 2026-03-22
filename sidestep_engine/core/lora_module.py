@@ -483,13 +483,27 @@ class FixedLoRAModule(nn.Module):
             flow = x1 - x0
             pred = decoder_outputs[0]
 
-            # Per-element loss: Huber (default) or MSE
-            if self._loss_fn == "huber":
-                per_element = F.smooth_l1_loss(
-                    pred, flow, beta=self._huber_delta, reduction="none",
-                )
+            # Per-element loss computation
+            _is_x0 = self._loss_fn.startswith("x0_")
+            if _is_x0:
+                # x₀-prediction: loss on reconstructed clean latent
+                # x0_pred = xt - t * pred_velocity; target = x0
+                _error = (xt - t_ * pred) - x0  # [B, T, 64]
             else:
-                per_element = F.mse_loss(pred, flow, reduction="none")
+                # Velocity-prediction: loss on predicted flow
+                _error = pred - flow  # [B, T, 64]
+
+            _fn = self._loss_fn.replace("x0_", "")  # strip x0_ prefix
+            if _fn == "huber":
+                per_element = F.smooth_l1_loss(
+                    _error, torch.zeros_like(_error),
+                    beta=self._huber_delta, reduction="none",
+                )
+            elif _fn == "pseudo_huber":
+                _d = self._huber_delta
+                per_element = _d * _d * (torch.sqrt(1.0 + (_error / _d) ** 2) - 1.0)
+            else:
+                per_element = _error ** 2  # MSE
 
             # Per-channel fidelity balancing
             if self._channel_balance and self._channel_weights is not None:
@@ -576,6 +590,15 @@ class FixedLoRAModule(nn.Module):
                         sm["fidelity/ch_dynamic_blend_range"] = float(
                             cw.max() / cw.min().clamp(min=1e-8)
                         )
+                # Arrangement vs detail split (always logged)
+                _t_flat = t.detach()
+                _loss_flat = per_sample_loss_raw.detach()
+                _hi = _t_flat > 0.5
+                _lo = ~_hi
+                if _hi.any():
+                    sm["fidelity/arrangement_loss"] = float(_loss_flat[_hi].mean())
+                if _lo.any():
+                    sm["fidelity/detail_loss"] = float(_loss_flat[_lo].mean())
 
         # fp32 for stable backward
         diffusion_loss = diffusion_loss.float()
