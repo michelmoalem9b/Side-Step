@@ -344,10 +344,10 @@ def cleanup_preprocessing_models(models: Dict[str, Any]) -> None:
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    elif torch.mps.is_available():
+    elif hasattr(torch, 'mps') and torch.mps.is_available():
         torch.mps.empty_cache()
-    elif torch.xpu.is_available():
-        torch.xpu.is_available()
+    elif hasattr(torch, 'xpu') and torch.xpu.is_available():
+        torch.xpu.empty_cache()
     logger.info("[OK] Preprocessing models cleaned up")
 
 
