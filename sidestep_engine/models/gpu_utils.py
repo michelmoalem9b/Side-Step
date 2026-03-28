@@ -86,8 +86,8 @@ def detect_gpu(requested_device: str = "auto", requested_precision: str = "auto"
         vram_free = _cuda_free_mb(idx)
     elif device_type == "mps":
         name = "Apple MPS"
-        vram_total = torch.mps.driver_allocated_memory() / (1024 ** 2) # TODO
-        vram_free = torch.mps.current_allocated_memory() / (1024 ** 2) # TODO
+        vram_total = torch.mps.recommended_max_memory() / (1024 ** 2)
+        vram_free = (torch.mps.recommended_max_memory() - torch.mps.current_allocated_memory()) / (1024 ** 2)
     elif device_type == "xpu":
         idx = 0
         if ":" in device_str:

@@ -464,8 +464,6 @@ def _pass1_light(
 
             except Exception as exc:
                 failed += 1
-                print(exc)
-                import pdb; pdb.set_trace()
                 logger.error("[Side-Step] Pass 1 FAIL %s: %s", af.name, exc)
 
     finally:

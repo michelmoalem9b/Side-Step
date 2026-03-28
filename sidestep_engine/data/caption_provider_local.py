@@ -358,9 +358,9 @@ def _load_model(tier: str, *, allow_cpu_offload: bool = False) -> None:
 
     if torch.cuda.is_available():
         load_kwargs["device_map"] = "auto" if allow_cpu_offload else {"": "cuda:0"}
-    elif torch.mps.is_available():
+    elif hasattr(torch, 'mps') and torch.mps.is_available():
         load_kwargs["device_map"] = "mps"
-    elif torch.xpu.is_available():
+    elif hasattr(torch, 'xpu') and torch.xpu.is_available():
         load_kwargs["device_map"] = "xpu"
     else:
         load_kwargs["device_map"] = "cpu"
