@@ -226,8 +226,8 @@ def capture_rng_state(device: Any = None) -> Dict[str, Any]:
             rng["mps_device"] = idx
             rng["mps_rng"] = torch.mps.get_rng_state(dev)
         elif torch.xpu.is_available():
-            rng["xps_device"] = idx
-            rng["xps_rng"] = torch.mps.get_rng_state(dev)
+            rng["xpu_device"] = idx
+            rng["xpu_rng"] = torch.xpu.get_rng_state(dev)
     except Exception as exc:
         logger.debug("Could not capture RNG state: %s", exc)
     return rng
