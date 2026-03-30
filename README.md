@@ -1,3 +1,13 @@
+**************************************************************
+
+THIS IS A FORK THAT MEANT TO FREEZE THE CODE AT THIS POINT FOR SAFETY IN CASE CODE UPDATES BEAR MY DOWNSTREAM PROJECT.
+
+PLEASE DONT USE THIS REPO UNLESS YOU KNOW WHY YOU ARE DOING SO
+
+************************************************************
+
+
+
 # Side-Step for ACE-Step 1.5
 
 ```
