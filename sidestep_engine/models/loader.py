@@ -12,17 +12,16 @@ context, and provides proper cleanup helpers.
 from __future__ import annotations
 
 import gc
-import importlib.machinery
-import importlib.util
 import json
 import logging
 import os
 import sys
-import types
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import torch
+
+from sidestep_engine.models.acestep_remote_imports import _ensure_acestep_remote_imports
 
 logger = logging.getLogger(__name__)
 
@@ -159,101 +158,6 @@ def read_model_config(checkpoint_dir: str | Path, variant: str) -> Dict[str, Any
     return json.loads(config_path.read_text(encoding="utf-8"))
 
 
-def _prepend_acestep_src_paths() -> None:
-    """If a local ACE-Step checkout exists, prepend it so ``import acestep`` works."""
-    candidates: list[Path] = []
-    env = os.environ.get("ACESTEP_SRC")
-    if env:
-        candidates.append(Path(env).expanduser().resolve())
-    # sidestep_engine/models/loader.py -> parents[2] == Side-Step repo root
-    side_step_root = Path(__file__).resolve().parents[2]
-    candidates.append((side_step_root.parent / "ACE-Step-1.5").resolve())
-    candidates.append((side_step_root / "vendor" / "ACE-Step-1.5").resolve())
-
-    for root in candidates:
-        if (root / "acestep" / "__init__.py").is_file():
-            s = str(root)
-            if s not in sys.path:
-                sys.path.insert(0, s)
-            logger.debug("Prepended ACE-Step import path: %s", root)
-            return
-
-
-def _safe_find_spec(name: str):
-    """Like :func:`importlib.util.find_spec` but never raises on broken stubs.
-
-    A module sitting in ``sys.modules`` with ``__spec__ is None`` (e.g. an older
-    manual shim) makes :func:`importlib.util.find_spec` raise ``ValueError``.
-    """
-    try:
-        return importlib.util.find_spec(name)
-    except (ValueError, ImportError, ModuleNotFoundError):
-        return None
-
-
-def _ensure_acestep_remote_imports() -> None:
-    """Prepare ``acestep.models.*`` for HuggingFace ``trust_remote_code`` snapshots.
-
-    Some checkpoints import ``acestep.models.flow_matching_solvers``.  An older
-    Side-Step workaround registered ``acestep.models`` as a plain
-    :class:`types.ModuleType` **without** :attr:`__path__`, which makes
-    ``acestep.models`` a non-package and breaks ``from acestep.models.X``.
-
-    We first try to load the real upstream package via :func:`_prepend_acestep_src_paths`,
-    then register namespace-package stubs only when imports are still missing, and
-    finally add a minimal ``flow_matching_solvers`` shim if that submodule is absent.
-    """
-    _prepend_acestep_src_paths()
-
-    if _safe_find_spec("acestep") is None:
-        if "acestep" not in sys.modules:
-            stub = types.ModuleType("acestep")
-            stub.__path__ = []
-            sys.modules["acestep"] = stub
-    else:
-        ace = sys.modules.get("acestep")
-        if ace is not None and not getattr(ace, "__path__", None):
-            ace.__path__ = []
-
-    if _safe_find_spec("acestep.models") is None:
-        if "acestep.models" not in sys.modules:
-            mp = types.ModuleType("acestep.models")
-            mp.__path__ = []
-            sys.modules["acestep.models"] = mp
-    else:
-        mp = sys.modules.get("acestep.models")
-        if mp is not None and not getattr(mp, "__path__", None):
-            mp.__path__ = []
-
-    fms_name = "acestep.models.flow_matching_solvers"
-    # Older shims registered this name without __spec__, which breaks find_spec.
-    _fms_existing = sys.modules.get(fms_name)
-    if _fms_existing is not None and getattr(_fms_existing, "__spec__", None) is None:
-        _fms_existing.__spec__ = importlib.machinery.ModuleSpec(
-            fms_name, loader=None, origin="side-step-shim"
-        )
-        _fms_existing.__loader__ = None
-        if not hasattr(_fms_existing, "SOLVER_REGISTRY"):
-            _fms_existing.SOLVER_REGISTRY = {}
-        if not hasattr(_fms_existing, "VALID_INFER_METHODS"):
-            _fms_existing.VALID_INFER_METHODS = frozenset()
-
-    if _safe_find_spec(fms_name) is None:
-        fms = types.ModuleType(fms_name)
-        fms.__spec__ = importlib.machinery.ModuleSpec(
-            fms_name, loader=None, origin="side-step-shim"
-        )
-        fms.__loader__ = None
-        fms.SOLVER_REGISTRY = {}
-        fms.VALID_INFER_METHODS = frozenset()
-        sys.modules[fms_name] = fms
-        logger.debug(
-            "Using minimal acestep.models.flow_matching_solvers shim (no upstream "
-            "module on sys.path). Set ACESTEP_SRC to a full ACE-Step tree if you "
-            "need non-default flow solvers."
-        )
-
-
 # ---------------------------------------------------------------------------
 # Decoder loading (for training / estimation)
 # ---------------------------------------------------------------------------
@@ -325,11 +229,14 @@ def load_decoder_for_training(
                     f"The model files in {model_dir} require a Python package "
                     f"that is not installed.\n\n"
                     f"  Original error: {err_text}\n\n"
-                    f"This usually means the checkpoint files are outdated. "
-                    f"Please re-download the ACE-Step checkpoint (the upstream "
-                    f"project removed this dependency in newer releases).\n"
-                    f"If the issue persists, check that 'vector_quantize_pytorch' "
-                    f"and 'einops' are installed in your environment."
+                    f"If the error names ``acestep`` or ``acestep.models``, ensure "
+                    f"Side-Step can resolve the bundled/common ACE-Step modules "
+                    f"(set ``ACESTEP_SRC`` to a full ACE-Step checkout, or place "
+                    f"``ACE-Step-1.5`` next to the Side-Step repo). "
+                    f"Checkpoint Python stubs may also be outdated; try re-downloading "
+                    f"weights from HuggingFace.\n"
+                    f"If the error names other packages, check that "
+                    f"'vector_quantize_pytorch' and 'einops' are installed."
                 ) from exc
             last_err = exc
             next_backend = attn_candidates[idx + 1] if idx + 1 < len(attn_candidates) else None
