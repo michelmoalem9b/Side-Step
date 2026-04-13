@@ -487,8 +487,6 @@ const WorkspaceBehaviors = (() => {
     if (typeof WorkspaceDatasets !== "undefined") WorkspaceDatasets.init();
   }
 
-  return { init, showConfirmModal, showPromptModal };
-
   function showConfirmModal(title, message, confirmLabel, onConfirm, onCancel) {
     const modal = $("confirm-modal");
     if (!modal) { if (typeof onConfirm === "function") onConfirm(); return; }
@@ -534,4 +532,6 @@ const WorkspaceBehaviors = (() => {
     setTimeout(() => input?.focus(), 60);
     return new Promise((resolve) => { _promptResolve = resolve; });
   }
+
+  return { init, showConfirmModal, showPromptModal };
 })();

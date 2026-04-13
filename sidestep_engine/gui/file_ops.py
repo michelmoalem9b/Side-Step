@@ -485,13 +485,39 @@ def scan_audio_dir(path: str) -> Dict[str, Any]:
     }
 
 
+def _link_or_copy_mix_file(src: Path, dest: Path) -> None:
+    """Create *dest* pointing at *src*: symlink, else hard link, else copy.
+
+    Windows often denies symlinks without Developer Mode / elevation; hard links
+    and copies keep mix datasets usable without extra privileges.
+    """
+    if dest.exists():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.symlink(str(src), str(dest))
+        return
+    except OSError:
+        pass
+    try:
+        os.link(str(src), str(dest))
+        return
+    except OSError:
+        pass
+    shutil.copy2(str(src), str(dest))
+
+
 def create_mix_dataset(
     source_root: str,
     destination_root: str,
     mix_name: str,
     files: List[str],
 ) -> Dict[str, Any]:
-    """Create a storage-light mixed dataset by symlinking selected audio files."""
+    """Create a mixed dataset by linking selected audio files into one folder.
+
+    Prefers symlinks (space-efficient); falls back to hard links or file copies
+    when the OS disallows symlinks (common on Windows without Developer Mode).
+    """
     src_root = _resolve_gui_path(source_root)
     dest_root = _resolve_gui_path(destination_root)
     name = str(mix_name or "").strip()
@@ -499,6 +525,7 @@ def create_mix_dataset(
         return {"ok": False, "error": "Missing mix_name"}
     if not src_root.is_dir():
         return {"ok": False, "error": f"Invalid source root: {src_root}"}
+    src_root_res = src_root.resolve(strict=False)
     if not dest_root.exists():
         try:
             dest_root.mkdir(parents=True, exist_ok=True)
@@ -535,7 +562,8 @@ def create_mix_dataset(
             skipped += 1
             continue
         try:
-            rel = src.relative_to(src_root)
+            src_res = src.resolve(strict=False)
+            rel = src_res.relative_to(src_root_res)
         except ValueError:
             skipped += 1
             continue
@@ -547,20 +575,20 @@ def create_mix_dataset(
             continue
 
         try:
-            os.symlink(str(src), str(dest_audio))
+            _link_or_copy_mix_file(src_res, dest_audio)
             created += 1
         except OSError as exc:
             errors.append(f"{src.name}: {exc}")
             continue
 
-        src_sidecar = src.with_suffix(".txt")
+        src_sidecar = src_res.with_suffix(".txt")
         if src_sidecar.is_file():
             dest_sidecar = dest_audio.with_suffix(".txt")
             if not dest_sidecar.exists():
                 try:
-                    os.symlink(str(src_sidecar), str(dest_sidecar))
+                    _link_or_copy_mix_file(src_sidecar, dest_sidecar)
                 except OSError:
-                    # Sidecar symlink failures should not fail the whole mix.
+                    # Sidecar failures should not fail the whole mix.
                     pass
 
     return {
