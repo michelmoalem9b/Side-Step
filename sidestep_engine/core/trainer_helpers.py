@@ -745,30 +745,47 @@ def resume_checkpoint(
             if hasattr(decoder, "_forward_module"):
                 decoder = decoder._forward_module
 
-            # Use the resume ladder instead of a bare ``load_state_dict`` --
-            # the latter silently drops LoRA keys when PEFT's on-disk format
-            # does not align with the live PeftModel's adapter-name-aware
-            # keys, which manifests as "loss jumps back up on resume".
-            from sidestep_engine.core.lora_resume_ladder import (
-                load_lora_resume_weights,
-            )
-            try:
-                ladder_result = load_lora_resume_weights(decoder, state_dict)
-            except RuntimeError as exc:
-                yield TrainingUpdate(
-                    0, 0.0,
-                    f"[FAIL] {exc}",
-                    kind="fail",
+            # Use the resume ladder for LoRA/DoRA adapters (PEFT-format keys).
+            # OFT and other adapter types that don't use LoRA-style keys
+            # should skip the ladder to avoid KeyError on missing LoRA keys.
+            adapter_type = trainer.adapter_type
+            if adapter_type in ("lora", "dora"):
+                from sidestep_engine.core.lora_resume_ladder import (
+                    load_lora_resume_weights,
                 )
-                return None
+                try:
+                    ladder_result = load_lora_resume_weights(decoder, state_dict)
+                except RuntimeError as exc:
+                    yield TrainingUpdate(
+                        0, 0.0,
+                        f"[FAIL] {exc}",
+                        kind="fail",
+                    )
+                    return None
 
-            ladder_msg = (
-                f"[OK] LoRA weights loaded via {ladder_result.strategy} "
-                f"({ladder_result.matched_lora_keys}/{ladder_result.total_lora_keys} keys)"
-            )
-            yield TrainingUpdate(0, 0.0, ladder_msg, kind="info")
-            for warn in ladder_result.warnings:
-                yield TrainingUpdate(0, 0.0, f"[WARN] {warn}", kind="warn")
+                ladder_msg = (
+                    f"[OK] LoRA weights loaded via {ladder_result.strategy} "
+                    f"({ladder_result.matched_lora_keys}/{ladder_result.total_lora_keys} keys)"
+                )
+                yield TrainingUpdate(0, 0.0, ladder_msg, kind="info")
+                for warn in ladder_result.warnings:
+                    yield TrainingUpdate(0, 0.0, f"[WARN] {warn}", kind="warn")
+            else:
+                # OFT and other non-LoRA adapters: skip ladder, use direct load_state_dict
+                try:
+                    decoder.load_state_dict(state_dict, strict=False)
+                    yield TrainingUpdate(
+                        0, 0.0,
+                        f"[OK] {adapter_type.upper()} adapter weights loaded directly (non-LoRA format)",
+                        kind="info",
+                    )
+                except Exception as exc:
+                    yield TrainingUpdate(
+                        0, 0.0,
+                        f"[FAIL] Failed to load {adapter_type.upper()} weights: {exc}",
+                        kind="fail",
+                    )
+                    return None
 
             start_epoch = ckpt_info["epoch"]
             g_step = ckpt_info["global_step"]

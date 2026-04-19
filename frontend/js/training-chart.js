@@ -145,7 +145,16 @@ const TrainingChart = (() => {
     // see a flat baseline rather than a blank canvas.
     if (fullLoss.length === 1) {
       fullLoss = [fullLoss[0], fullLoss[0]];
-      fullLr = fullLr.length === 1 ? [fullLr[0], fullLr[0]] : fullLr;
+      // Normalize fullLr to match fullLoss length (always 2 after duplication)
+      const lrSlice = fullLr.slice(0, 2);
+      if (lrSlice.length < 2) {
+        // Pad by duplicating the last available LR value (or single value)
+        const lastLr = lrSlice.length > 0 ? lrSlice[lrSlice.length - 1] : 0;
+        while (lrSlice.length < 2) {
+          lrSlice.push(lastLr);
+        }
+      }
+      fullLr = lrSlice;
     }
     const svg = $('monitor-loss-svg');
     const lossLine = $('monitor-loss-line');

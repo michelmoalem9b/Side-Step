@@ -266,8 +266,8 @@ def _preview_resume(
     else:
         print_message(
             f"No adapter weights (.safetensors/.bin) found in {ckpt}. "
-            "The resume loader will only restore optimizer/scheduler state; "
-            "model weights will start fresh.",
+            "Resume will not occur -- no optimizer, scheduler, or model state "
+            "will be restored. Training will start from scratch.",
             kind="warn",
         )
 

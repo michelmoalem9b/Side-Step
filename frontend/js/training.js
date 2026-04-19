@@ -167,13 +167,9 @@ const Training = (() => {
         loss.push(_epochLossAccum / _epochStepCount);
         lr.push(_lr);
       }
-      // During the first epoch there is only one point (the running average),
-      // which the polyline renderer silently skips. Duplicate it so the chart
-      // draws a visible flat baseline that updates live as the average shifts.
-      if (loss.length === 1) {
-        loss.unshift(loss[0]);
-        lr.unshift(lr[0]);
-      }
+      // TrainingChart.render() now handles single-point rendering via duplication,
+      // so return only real samples here to keep getDataAtIndex()/getChartView()
+      // consumers working correctly without synthetic leading points.
       return { loss, lr, label: 'Epoch' };
     }
     return { loss: _lossHistory, lr: _lrHistory, label: 'Step' };
