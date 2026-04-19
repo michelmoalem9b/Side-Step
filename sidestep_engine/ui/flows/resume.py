@@ -230,39 +230,59 @@ def _preview_resume(
     ckpt_path: str | Path,
     saved_adapter: Optional[dict[str, Any]],
 ) -> None:
-    """Show the weight format and resume strategy that will be used.
+    """Show the weight format and resume loader that will run.
 
-    Surfaces the intent of the resume ladder (``set_peft_model_state_dict``
-    with auto-remap fallback) so users understand the loader's behaviour and
-    can distinguish between LoRA/PEFT and LyCORIS paths before training
-    starts.  Emits warnings when the adapter config is missing or when the
-    checkpoint has no loadable adapter weights at all.
+    Routes by ``adapter_type`` from ``sidestep_adapter_config.json`` when
+    available, because OFT checkpoints also ship as
+    ``adapter_model.safetensors`` and go through a *different* loader than
+    LoRA/DoRA -- they must not advertise the LoRA ladder's hard-fail
+    semantics.  When ``saved_adapter`` is missing we fall back to file-based
+    detection but soften the description so we don't lie about behaviour
+    we cannot prove.
     """
     ckpt = Path(ckpt_path)
     has_peft_st = (ckpt / "adapter_model.safetensors").exists()
     has_peft_bin = (ckpt / "adapter_model.bin").exists()
     has_loha = (ckpt / "loha_weights.safetensors").exists()
     has_lokr = (ckpt / "lokr_weights.safetensors").exists()
+    adapter_type = (saved_adapter or {}).get("adapter_type")
 
     print_message("\nResume Plan", kind="heading")
 
-    if has_loha:
+    if adapter_type == "loha" or has_loha:
         print_rich("[dim]Format:[/] LoHA (loha_weights.safetensors)")
         print_rich("[dim]Loader:[/] load_loha_weights (direct)")
-    elif has_lokr:
+    elif adapter_type == "lokr" or has_lokr:
         print_rich("[dim]Format:[/] LoKR (lokr_weights.safetensors)")
         print_rich("[dim]Loader:[/] load_lokr_weights (direct)")
     elif has_peft_st or has_peft_bin:
         which = "adapter_model.safetensors" if has_peft_st else "adapter_model.bin"
-        print_rich(f"[dim]Format:[/] PEFT adapter ({which})")
-        print_rich(
-            "[dim]Loader:[/] resume ladder "
-            "(peft.set_peft_model_state_dict \u2192 auto-remap fallback)"
-        )
-        print_rich(
-            "[dim]Failure mode:[/] hard fail if zero LoRA keys match "
-            "(no silent fresh-weight restart)"
-        )
+        if adapter_type in ("lora", "dora"):
+            label = "LoRA" if adapter_type == "lora" else "DoRA"
+            print_rich(f"[dim]Format:[/] {label} / PEFT adapter ({which})")
+            print_rich(
+                "[dim]Loader:[/] resume ladder "
+                "(peft.set_peft_model_state_dict \u2192 auto-remap fallback)"
+            )
+            print_rich(
+                "[dim]Failure mode:[/] hard fail if zero LoRA keys match "
+                "(no silent fresh-weight restart)"
+            )
+        elif adapter_type:
+            # Known non-LoRA PEFT adapter (e.g. OFT): direct loader path.
+            print_rich(f"[dim]Format:[/] {adapter_type.upper()} / PEFT adapter ({which})")
+            print_rich("[dim]Loader:[/] decoder.load_state_dict(strict=False) (direct)")
+            print_rich(
+                "[dim]Failure mode:[/] hard fail if 0 checkpoint keys are "
+                "consumed by the live model"
+            )
+        else:
+            # saved_adapter missing -- we cannot tell LoRA from OFT here.
+            print_rich(f"[dim]Format:[/] PEFT adapter ({which})")
+            print_rich(
+                "[dim]Loader:[/] determined at load time by adapter_type "
+                "(LoRA/DoRA \u2192 ladder; OFT/other \u2192 direct load_state_dict)"
+            )
     else:
         print_message(
             f"No adapter weights (.safetensors/.bin) found in {ckpt}. "
@@ -275,7 +295,7 @@ def _preview_resume(
         print_message(
             "sidestep_adapter_config.json not found alongside the adapter -- "
             "target_modules / rank cannot be cross-checked against the live "
-            "model. The ladder will still load by key overlap, but mismatches "
+            "model, and the exact loader cannot be previewed. Mismatches "
             "will only be detected at load time.",
             kind="warn",
         )

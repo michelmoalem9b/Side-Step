@@ -771,14 +771,14 @@ def resume_checkpoint(
                 for warn in ladder_result.warnings:
                     yield TrainingUpdate(0, 0.0, f"[WARN] {warn}", kind="warn")
             else:
-                # OFT and other non-LoRA adapters: skip ladder, use direct load_state_dict
+                # OFT and other non-LoRA adapters: skip the LoRA ladder and use
+                # ``load_state_dict(strict=False)`` directly. We still have to
+                # check the returned IncompatibleKeys -- otherwise a wholly
+                # mismatched checkpoint loads nothing and training silently
+                # restarts with fresh weights (same silent-failure pattern as
+                # the LoRA bug this ladder fixes).
                 try:
-                    decoder.load_state_dict(state_dict, strict=False)
-                    yield TrainingUpdate(
-                        0, 0.0,
-                        f"[OK] {adapter_type.upper()} adapter weights loaded directly (non-LoRA format)",
-                        kind="info",
-                    )
+                    ret = decoder.load_state_dict(state_dict, strict=False)
                 except Exception as exc:
                     yield TrainingUpdate(
                         0, 0.0,
@@ -786,6 +786,26 @@ def resume_checkpoint(
                         kind="fail",
                     )
                     return None
+
+                total = len(state_dict)
+                unexpected = list(getattr(ret, "unexpected_keys", []) or [])
+                matched = max(0, total - len(unexpected))
+                if matched == 0:
+                    yield TrainingUpdate(
+                        0, 0.0,
+                        f"[FAIL] {adapter_type.upper()} resume loaded 0/{total} "
+                        f"keys from {aw_path} -- checkpoint keys do not match "
+                        "the live model (different adapter_type, rank, or "
+                        "target_modules?). Refusing to resume with fresh weights.",
+                        kind="fail",
+                    )
+                    return None
+                yield TrainingUpdate(
+                    0, 0.0,
+                    f"[OK] {adapter_type.upper()} adapter weights loaded "
+                    f"({matched}/{total} keys, direct load_state_dict)",
+                    kind="info",
+                )
 
             start_epoch = ckpt_info["epoch"]
             g_step = ckpt_info["global_step"]
