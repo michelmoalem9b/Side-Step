@@ -226,6 +226,61 @@ def _edit_safe_fields(answers: dict) -> None:
             answers[key] = ask(label, default=current, allow_back=True)
 
 
+def _preview_resume(
+    ckpt_path: str | Path,
+    saved_adapter: Optional[dict[str, Any]],
+) -> None:
+    """Show the weight format and resume strategy that will be used.
+
+    Surfaces the intent of the resume ladder (``set_peft_model_state_dict``
+    with auto-remap fallback) so users understand the loader's behaviour and
+    can distinguish between LoRA/PEFT and LyCORIS paths before training
+    starts.  Emits warnings when the adapter config is missing or when the
+    checkpoint has no loadable adapter weights at all.
+    """
+    ckpt = Path(ckpt_path)
+    has_peft_st = (ckpt / "adapter_model.safetensors").exists()
+    has_peft_bin = (ckpt / "adapter_model.bin").exists()
+    has_loha = (ckpt / "loha_weights.safetensors").exists()
+    has_lokr = (ckpt / "lokr_weights.safetensors").exists()
+
+    print_message("\nResume Plan", kind="heading")
+
+    if has_loha:
+        print_rich("[dim]Format:[/] LoHA (loha_weights.safetensors)")
+        print_rich("[dim]Loader:[/] load_loha_weights (direct)")
+    elif has_lokr:
+        print_rich("[dim]Format:[/] LoKR (lokr_weights.safetensors)")
+        print_rich("[dim]Loader:[/] load_lokr_weights (direct)")
+    elif has_peft_st or has_peft_bin:
+        which = "adapter_model.safetensors" if has_peft_st else "adapter_model.bin"
+        print_rich(f"[dim]Format:[/] PEFT adapter ({which})")
+        print_rich(
+            "[dim]Loader:[/] resume ladder "
+            "(peft.set_peft_model_state_dict \u2192 auto-remap fallback)"
+        )
+        print_rich(
+            "[dim]Failure mode:[/] hard fail if zero LoRA keys match "
+            "(no silent fresh-weight restart)"
+        )
+    else:
+        print_message(
+            f"No adapter weights (.safetensors/.bin) found in {ckpt}. "
+            "The resume loader will only restore optimizer/scheduler state; "
+            "model weights will start fresh.",
+            kind="warn",
+        )
+
+    if saved_adapter is None and (has_peft_st or has_peft_bin):
+        print_message(
+            "sidestep_adapter_config.json not found alongside the adapter -- "
+            "target_modules / rank cannot be cross-checked against the live "
+            "model. The ladder will still load by key overlap, but mismatches "
+            "will only be detected at load time.",
+            kind="warn",
+        )
+
+
 def _edit_dangerous_fields(answers: dict) -> None:
     """Let the user edit risky fields with warnings."""
     section("Dangerous settings (may affect training stability)")
@@ -433,6 +488,8 @@ def wizard_resume(
         f"[dim]Epochs:[/] {answers.get('epochs', '?')}  "
         f"[dim]Warmup:[/] {answers.get('warmup_steps', 0)} (skipped)"
     )
+
+    _preview_resume(ckpt_path, saved_adapter)
 
     if not ask_bool("Proceed with resume?", default=True, allow_back=True):
         raise GoBack()

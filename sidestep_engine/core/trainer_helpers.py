@@ -744,7 +744,31 @@ def resume_checkpoint(
             decoder = module.model.decoder
             if hasattr(decoder, "_forward_module"):
                 decoder = decoder._forward_module
-            decoder.load_state_dict(state_dict, strict=False)
+
+            # Use the resume ladder instead of a bare ``load_state_dict`` --
+            # the latter silently drops LoRA keys when PEFT's on-disk format
+            # does not align with the live PeftModel's adapter-name-aware
+            # keys, which manifests as "loss jumps back up on resume".
+            from sidestep_engine.core.lora_resume_ladder import (
+                load_lora_resume_weights,
+            )
+            try:
+                ladder_result = load_lora_resume_weights(decoder, state_dict)
+            except RuntimeError as exc:
+                yield TrainingUpdate(
+                    0, 0.0,
+                    f"[FAIL] {exc}",
+                    kind="fail",
+                )
+                return None
+
+            ladder_msg = (
+                f"[OK] LoRA weights loaded via {ladder_result.strategy} "
+                f"({ladder_result.matched_lora_keys}/{ladder_result.total_lora_keys} keys)"
+            )
+            yield TrainingUpdate(0, 0.0, ladder_msg, kind="info")
+            for warn in ladder_result.warnings:
+                yield TrainingUpdate(0, 0.0, f"[WARN] {warn}", kind="warn")
 
             start_epoch = ckpt_info["epoch"]
             g_step = ckpt_info["global_step"]
