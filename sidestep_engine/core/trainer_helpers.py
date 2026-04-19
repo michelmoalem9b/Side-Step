@@ -744,7 +744,68 @@ def resume_checkpoint(
             decoder = module.model.decoder
             if hasattr(decoder, "_forward_module"):
                 decoder = decoder._forward_module
-            decoder.load_state_dict(state_dict, strict=False)
+
+            # Use the resume ladder for LoRA/DoRA adapters (PEFT-format keys).
+            # OFT and other adapter types that don't use LoRA-style keys
+            # should skip the ladder to avoid KeyError on missing LoRA keys.
+            adapter_type = trainer.adapter_type
+            if adapter_type in ("lora", "dora"):
+                from sidestep_engine.core.lora_resume_ladder import (
+                    load_lora_resume_weights,
+                )
+                try:
+                    ladder_result = load_lora_resume_weights(decoder, state_dict)
+                except RuntimeError as exc:
+                    yield TrainingUpdate(
+                        0, 0.0,
+                        f"[FAIL] {exc}",
+                        kind="fail",
+                    )
+                    return None
+
+                ladder_msg = (
+                    f"[OK] LoRA weights loaded via {ladder_result.strategy} "
+                    f"({ladder_result.matched_lora_keys}/{ladder_result.total_lora_keys} keys)"
+                )
+                yield TrainingUpdate(0, 0.0, ladder_msg, kind="info")
+                for warn in ladder_result.warnings:
+                    yield TrainingUpdate(0, 0.0, f"[WARN] {warn}", kind="warn")
+            else:
+                # OFT and other non-LoRA adapters: skip the LoRA ladder and use
+                # ``load_state_dict(strict=False)`` directly. We still have to
+                # check the returned IncompatibleKeys -- otherwise a wholly
+                # mismatched checkpoint loads nothing and training silently
+                # restarts with fresh weights (same silent-failure pattern as
+                # the LoRA bug this ladder fixes).
+                try:
+                    ret = decoder.load_state_dict(state_dict, strict=False)
+                except Exception as exc:
+                    yield TrainingUpdate(
+                        0, 0.0,
+                        f"[FAIL] Failed to load {adapter_type.upper()} weights: {exc}",
+                        kind="fail",
+                    )
+                    return None
+
+                total = len(state_dict)
+                unexpected = list(getattr(ret, "unexpected_keys", []) or [])
+                matched = max(0, total - len(unexpected))
+                if matched == 0:
+                    yield TrainingUpdate(
+                        0, 0.0,
+                        f"[FAIL] {adapter_type.upper()} resume loaded 0/{total} "
+                        f"keys from {aw_path} -- checkpoint keys do not match "
+                        "the live model (different adapter_type, rank, or "
+                        "target_modules?). Refusing to resume with fresh weights.",
+                        kind="fail",
+                    )
+                    return None
+                yield TrainingUpdate(
+                    0, 0.0,
+                    f"[OK] {adapter_type.upper()} adapter weights loaded "
+                    f"({matched}/{total} keys, direct load_state_dict)",
+                    kind="info",
+                )
 
             start_epoch = ckpt_info["epoch"]
             g_step = ckpt_info["global_step"]
